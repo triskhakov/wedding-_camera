@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Свадебная Фотокамера — Анвар & Угилжон</title>
+    <title>Анвар & Угилжон • Свадебная Камера</title>
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -56,7 +56,7 @@
         }
 
         .glass-panel {
-            background: rgba(24, 22, 20, 0.88);
+            background: rgba(24, 22, 20, 0.90);
             backdrop-filter: blur(14px);
             -webkit-backdrop-filter: blur(14px);
             border: 1px solid rgba(212, 175, 55, 0.25);
@@ -82,12 +82,19 @@
             text-shadow: 0 0 8px rgba(212, 175, 55, 0.8), 0 0 15px rgba(212, 175, 55, 0.4);
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-8px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in {
-            animation: fadeIn 0.25s ease-out forwards;
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #printable-card, #printable-card * {
+                visibility: visible;
+            }
+            #printable-card {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
         }
     </style>
 </head>
@@ -104,48 +111,48 @@
     <div class="relative w-full h-full flex flex-col max-w-md mx-auto shadow-2xl bg-stone-950 overflow-hidden">
 
         <!-- Top Navigation / Header -->
-        <header class="relative z-20 px-4 py-3 flex items-center justify-between glass-panel border-b border-champagne-500/20">
+        <header class="relative z-20 px-3 py-2.5 flex items-center justify-between glass-panel border-b border-champagne-500/20">
             <div class="flex items-center space-x-2">
                 <div class="w-8 h-8 rounded-full bg-champagne-500/20 border border-champagne-500/40 flex items-center justify-center text-champagne-400 shadow">
                     <i class="fa-solid fa-heart text-xs"></i>
                 </div>
                 <div>
-                    <h1 class="font-serif text-lg font-bold tracking-wide text-champagne-200 leading-none" id="wedding-title">
+                    <h1 class="font-serif text-base font-bold tracking-wide text-champagne-200 leading-none" id="wedding-title">
                         Анвар & Угилжон
                     </h1>
-                    <p class="text-[10px] text-stone-400 tracking-wider uppercase" id="wedding-date">09 Ноября 2026</p>
+                    <p class="text-[10px] text-stone-400 tracking-wider uppercase" id="wedding-date">09.11.2026</p>
                 </div>
             </div>
 
-            <!-- View Switcher Tabs -->
+            <!-- Main Navigation Tabs -->
             <div class="flex items-center space-x-1 bg-stone-900/90 p-1 rounded-full border border-stone-800">
-                <button id="tab-camera" onclick="switchTab('camera')" class="px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 bg-champagne-500 text-stone-950 font-semibold shadow-md">
+                <button id="tab-camera" onclick="switchTab('camera')" class="px-2.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 bg-champagne-500 text-stone-950 shadow-md">
                     <i class="fa-solid fa-camera mr-1"></i> Камера
                 </button>
-                <button id="tab-album" onclick="switchTab('album')" class="px-3 py-1.5 rounded-full text-xs font-medium text-stone-300 hover:text-white transition-all duration-200">
+                <button id="tab-album" onclick="switchTab('album')" class="px-2.5 py-1.5 rounded-full text-xs font-medium text-stone-300 hover:text-white transition-all duration-200">
                     <i class="fa-solid fa-images mr-1"></i> Архив
                 </button>
-                <button id="tab-admin" onclick="switchTab('admin')" class="px-2 py-1.5 rounded-full text-xs font-medium text-stone-400 hover:text-champagne-400 transition-all duration-200" title="Панель молодоженов">
-                    <i class="fa-solid fa-lock"></i>
+                <button id="tab-admin" onclick="switchTab('admin')" class="px-2.5 py-1.5 rounded-full text-xs font-medium text-amber-300 hover:text-amber-200 transition-all duration-200 bg-amber-500/10 border border-amber-500/30">
+                    <i class="fa-solid fa-gear mr-1"></i> Организаторам
                 </button>
             </div>
         </header>
 
         <!-- DIAGNOSTIC BANNERS FOR ANDROID -->
-        <div id="inapp-browser-banner" class="hidden relative z-20 bg-amber-500/20 border-b border-amber-500/40 px-4 py-2.5 flex items-center justify-between text-xs text-amber-200">
+        <div id="inapp-browser-banner" class="hidden relative z-20 bg-amber-500/20 border-b border-amber-500/40 px-4 py-2 flex items-center justify-between text-xs text-amber-200">
             <div class="flex items-center space-x-2">
                 <i class="fa-solid fa-triangle-exclamation text-amber-400 text-sm flex-shrink-0"></i>
-                <span>Вы открыли через мессенджер. Браузер может блокировать камеру.</span>
+                <span>Открыто в мессенджере. Камера может быть заблокирована.</span>
             </div>
             <button onclick="openInAppModal()" class="ml-2 px-2.5 py-1 rounded-lg bg-amber-500 text-stone-950 font-bold text-[11px] flex-shrink-0">
-                Инструкция
+                Открыть в Chrome
             </button>
         </div>
 
         <div id="http-warning-banner" class="hidden relative z-20 bg-rose-500/20 border-b border-rose-500/40 px-4 py-2 flex items-center justify-between text-xs text-rose-200">
             <div class="flex items-center space-x-2">
                 <i class="fa-solid fa-lock-open text-rose-400 text-sm"></i>
-                <span>Требуется HTTPS. Включен режим стандартной камеры Android.</span>
+                <span>Включен стандартный режим съемки Android.</span>
             </div>
         </div>
 
@@ -161,7 +168,7 @@
                     <span id="shots-counter" class="font-mono font-bold text-sm text-champagne-400 film-counter-glow">15 / 15</span>
                 </div>
 
-                <!-- Camera Engine Tools -->
+                <!-- Camera Tools -->
                 <div class="pointer-events-auto flex space-x-2">
                     <button onclick="openPermissionGuideModal()" class="w-9 h-9 rounded-full glass-panel flex items-center justify-center text-amber-300 border border-amber-500/40 active:scale-95 transition" title="Инструкция доступа">
                         <i class="fa-solid fa-circle-question text-xs"></i>
@@ -188,11 +195,11 @@
                     <div class="w-20 h-20 rounded-full bg-champagne-500/15 border border-champagne-500/40 flex items-center justify-center text-champagne-400 text-3xl mb-4">
                         <i class="fa-solid fa-mobile-retro"></i>
                     </div>
-                    <h3 class="font-serif text-xl text-champagne-200 mb-1">Режим Стандартной Камеры</h3>
+                    <h3 class="font-serif text-xl text-champagne-200 mb-1">Режим Камеры Android</h3>
                     <p class="text-xs text-stone-300 max-w-xs mb-4 leading-relaxed" id="fallback-reason-text">
-                        При нажатии на золотую кнопку откроется штатная камера вашего телефона. Все снимки автоматически сохранятся в свадебную галерею.
+                        При нажатии на золотую кнопку откроется стандартная камера телефона. Снимок автоматически сохранится в архив свадьбы.
                     </p>
-                    <button onclick="triggerShutter()" class="px-6 py-2.5 rounded-full bg-gradient-to-r from-champagne-500 to-champagne-600 text-stone-950 font-semibold text-xs uppercase tracking-wider shadow-lg active:scale-95 transition">
+                    <button onclick="triggerShutter()" class="px-6 py-2.5 rounded-full bg-gradient-to-r from-champagne-500 to-champagne-600 text-stone-950 font-bold text-xs uppercase tracking-wider shadow-lg active:scale-95 transition">
                         <i class="fa-solid fa-camera mr-1"></i> Сделать кадр
                     </button>
                 </div>
@@ -216,7 +223,7 @@
 
                     <div class="flex justify-between items-end">
                         <div class="w-5 h-5 border-b-2 border-l-2 border-champagne-400/80"></div>
-                        <p id="overlay-frame-subtitle" class="text-[9px] uppercase font-mono tracking-widest text-stone-300 drop-shadow">Wedding Memory • <span id="current-frame-style-name">Классик</span></p>
+                        <p id="overlay-frame-subtitle" class="text-[9px] uppercase font-mono tracking-widest text-stone-300 drop-shadow">WEDDING MEMORY • <span id="current-frame-style-name">КЛАССИК</span></p>
                         <div class="w-5 h-5 border-b-2 border-r-2 border-champagne-400/80"></div>
                     </div>
                 </div>
@@ -231,54 +238,54 @@
                     
                     <div class="flex flex-col w-full max-w-xs space-y-2.5">
                         <button onclick="initCamera()" class="w-full py-3 rounded-full bg-gradient-to-r from-champagne-500 to-champagne-600 text-stone-950 font-bold text-xs uppercase tracking-wider shadow-lg active:scale-95 transition">
-                            Разрешить Камеру
+                            Включить Камеру
                         </button>
-                        <button onclick="switchToNativeFallbackEngine('Пользователь выбрал стандартную камеру.')" class="w-full py-2.5 rounded-full bg-stone-800 border border-stone-700 text-stone-300 text-xs hover:bg-stone-700 transition">
-                            Открыть стандартную камеру
+                        <button onclick="switchToNativeFallbackEngine('Используется стандартное приложение камеры.')" class="w-full py-2.5 rounded-full bg-stone-800 border border-stone-700 text-stone-300 text-xs hover:bg-stone-700 transition">
+                            Открыть камеру телефона
                         </button>
                     </div>
                 </div>
             </div>
 
             <!-- Bottom Controls Deck -->
-            <div class="relative z-20 glass-panel border-t border-champagne-500/20 pt-2.5 pb-5 px-4 flex flex-col items-center space-y-2.5">
+            <div class="relative z-20 glass-panel border-t border-champagne-500/20 pt-2 pb-4 px-4 flex flex-col items-center space-y-2">
                 
-                <!-- Active Camera Engine Badge -->
+                <!-- Status Badge -->
                 <div class="w-full flex items-center justify-between text-[10px]">
                     <span id="engine-status-badge" class="text-stone-400 flex items-center space-x-1">
                         <span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
                         <span id="engine-status-text">Прямой эфир</span>
                     </span>
-                    <button onclick="switchTab('album')" class="text-champagne-400 hover:underline flex items-center font-semibold">
-                        Перейти в Архив <i class="fa-solid fa-chevron-right text-[8px] ml-1"></i>
+                    <button onclick="switchTab('album')" class="text-champagne-400 hover:underline flex items-center font-medium">
+                        Смотреть все фото <i class="fa-solid fa-chevron-right text-[8px] ml-1"></i>
                     </button>
                 </div>
 
                 <!-- Mini Filmstrip Preview -->
-                <div id="mini-gallery" class="w-full flex space-x-2 overflow-x-auto pb-1 min-h-[48px] items-center">
-                    <div class="text-[11px] text-stone-500 italic py-2 text-center w-full">Сделайте ваш первый кадр!</div>
+                <div id="mini-gallery" class="w-full flex space-x-2 overflow-x-auto pb-1 min-h-[44px] items-center">
+                    <div class="text-[11px] text-stone-500 italic py-1 text-center w-full">Сделайте ваш первый кадр!</div>
                 </div>
 
                 <!-- Main Shutter Button Deck -->
                 <div class="w-full flex items-center justify-around pt-1">
-                    <!-- Guest Name Tag Button -->
+                    <!-- Guest Name Button -->
                     <button onclick="promptGuestName()" class="flex flex-col items-center text-stone-400 hover:text-champagne-300 transition group">
                         <div class="w-10 h-10 rounded-full border border-stone-700 bg-stone-900 flex items-center justify-center group-hover:border-champagne-500/50">
                             <i class="fa-solid fa-user-pen text-xs"></i>
                         </div>
-                        <span class="text-[9px] mt-1 truncate max-w-[65px]" id="lbl-guest-name">Вы</span>
+                        <span class="text-[9px] mt-1 truncate max-w-[65px]" id="lbl-guest-name">Гость</span>
                     </button>
 
                     <!-- Big Golden Shutter Button -->
-                    <button id="shutter-btn" onclick="triggerShutter()" class="relative w-20 h-20 rounded-full bg-gradient-to-tr from-champagne-600 via-champagne-400 to-champagne-200 p-1 shadow-2xl active:scale-95 transition-transform duration-100 shutter-btn-active">
+                    <button id="shutter-btn" onclick="triggerShutter()" class="relative w-16 h-16 rounded-full bg-gradient-to-tr from-champagne-600 via-champagne-400 to-champagne-200 p-1 shadow-2xl active:scale-95 transition-transform duration-100 shutter-btn-active">
                         <div class="w-full h-full rounded-full border-2 border-stone-900 bg-gradient-to-b from-stone-800 to-stone-950 flex items-center justify-center">
-                            <div class="w-14 h-14 rounded-full bg-stone-100/90 border border-champagne-300 flex items-center justify-center shadow-inner">
-                                <i class="fa-solid fa-heart text-champagne-600 text-lg"></i>
+                            <div class="w-11 h-11 rounded-full bg-stone-100/90 border border-champagne-300 flex items-center justify-center shadow-inner">
+                                <i class="fa-solid fa-heart text-champagne-600 text-sm"></i>
                             </div>
                         </div>
                     </button>
 
-                    <!-- Hidden Native Android Camera Input -->
+                    <!-- Hidden Native Android Input -->
                     <input type="file" id="native-camera-input" accept="image/*" capture="environment" class="hidden" onchange="handleNativeCameraCapture(event)">
 
                     <!-- Share QR Button -->
@@ -297,9 +304,9 @@
             <div class="flex items-center justify-between mb-4 pb-2 border-b border-stone-800">
                 <div>
                     <h2 class="font-serif text-xl text-champagne-200 font-bold">Свадебный Архив</h2>
-                    <p class="text-xs text-stone-400">Фотографии всех гостей торжества</p>
+                    <p class="text-xs text-stone-400">Все фотографии гостей свадьбы</p>
                 </div>
-                <button onclick="refreshSharedAlbum()" class="px-3 py-1.5 rounded-full bg-stone-800 border border-stone-700 text-xs text-champagne-300 hover:bg-stone-700 transition">
+                <button onclick="loadPublicPhotos()" class="px-3 py-1.5 rounded-full bg-stone-800 border border-stone-700 text-xs text-champagne-300 hover:bg-stone-700">
                     <i class="fa-solid fa-rotate-right mr-1"></i> Обновить
                 </button>
             </div>
@@ -311,32 +318,32 @@
             </div>
         </main>
 
-        <!-- VIEW 3: ADMIN / NEWLYWEDS PANEL -->
-        <main id="view-admin" class="hidden flex-1 flex-col overflow-y-auto bg-stone-950 p-5">
+        <!-- VIEW 3: ADMIN / ORGANIZERS PANEL -->
+        <main id="view-admin" class="hidden flex-1 flex-col overflow-y-auto bg-stone-950 p-4">
             <!-- Password Check -->
             <div id="admin-auth-container" class="my-auto flex flex-col items-center text-center p-6 glass-panel rounded-2xl border border-champagne-500/30">
                 <div class="w-12 h-12 rounded-full bg-champagne-500/10 border border-champagne-500/30 flex items-center justify-center text-champagne-400 text-xl mb-3">
-                    <i class="fa-solid fa-key"></i>
+                    <i class="fa-solid fa-lock"></i>
                 </div>
-                <h3 class="font-serif text-lg text-champagne-200 font-bold mb-1">Панель Молодоженов</h3>
-                <p class="text-xs text-stone-400 mb-4">Введите пин-код для выгрузки всех снимков (по умолчанию: 2026)</p>
-                <input id="admin-pin-input" type="password" maxlength="6" placeholder="ПИН" class="w-full text-center px-4 py-2.5 rounded-xl bg-stone-900 border border-stone-700 text-champagne-200 font-mono tracking-widest mb-3 focus:outline-none focus:border-champagne-500">
+                <h3 class="font-serif text-xl text-champagne-200 font-bold mb-1">Панель Организаторов</h3>
+                <p class="text-xs text-stone-400 mb-4">Введите ПИН-код для скачивания архива всех фото (ПИН: 2026)</p>
+                <input id="admin-pin-input" type="password" maxlength="6" placeholder="2026" class="w-full text-center px-4 py-2.5 rounded-xl bg-stone-900 border border-stone-700 text-champagne-200 font-mono tracking-widest mb-3 focus:outline-none focus:border-champagne-500">
                 <button onclick="authenticateAdmin()" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-champagne-500 to-champagne-600 text-stone-950 font-bold text-xs uppercase tracking-wider shadow-lg">
-                    Войти
+                    Войти в панель
                 </button>
             </div>
 
             <!-- Admin Dashboard Content -->
             <div id="admin-dashboard-content" class="hidden flex-col space-y-4 pb-20">
                 <div class="p-4 rounded-2xl glass-gold">
-                    <h3 class="font-serif text-lg font-bold text-champagne-200 mb-1">Статистика Галереи</h3>
+                    <h3 class="font-serif text-lg font-bold text-champagne-200 mb-1">Статистика Свадьбы</h3>
                     <div class="grid grid-cols-2 gap-3 mt-3">
                         <div class="bg-stone-900/80 p-3 rounded-xl border border-stone-800">
-                            <span class="text-[10px] text-stone-400 uppercase">Всего фотографий</span>
+                            <span class="text-[10px] text-stone-400 uppercase">Всего фото</span>
                             <p class="text-2xl font-bold font-mono text-champagne-400" id="stat-total-photos">0</p>
                         </div>
                         <div class="bg-stone-900/80 p-3 rounded-xl border border-stone-800">
-                            <span class="text-[10px] text-stone-400 uppercase">Уникальных гостей</span>
+                            <span class="text-[10px] text-stone-400 uppercase">Гостей со снимками</span>
                             <p class="text-2xl font-bold font-mono text-champagne-400" id="stat-total-guests">0</p>
                         </div>
                     </div>
@@ -344,19 +351,36 @@
 
                 <!-- Export Options -->
                 <div class="p-4 rounded-2xl glass-panel border border-stone-800 space-y-3">
-                    <h4 class="font-serif text-md font-bold text-champagne-200">Скачивание Архива</h4>
-                    <p class="text-xs text-stone-400">Скачайте все полученные фотографии в один ZIP-архив.</p>
+                    <h4 class="font-serif text-md font-bold text-champagne-200"><i class="fa-solid fa-file-zipper mr-1.5 text-champagne-400"></i>Скачать все фото</h4>
+                    <p class="text-xs text-stone-400">Скачайте снимки всех гостей в один удобный ZIP-архив.</p>
                     <button id="btn-download-zip" onclick="downloadAllPhotosZip()" class="w-full py-3 rounded-xl bg-champagne-500 hover:bg-champagne-400 text-stone-950 font-bold text-xs uppercase tracking-wider flex items-center justify-center space-x-2 shadow-lg transition">
-                        <i class="fa-solid fa-file-zipper text-sm"></i>
+                        <i class="fa-solid fa-download"></i>
                         <span>Скачать ZIP Архив</span>
                     </button>
                 </div>
 
+                <!-- QR Code Link Config -->
+                <div class="p-4 rounded-2xl glass-panel border border-stone-800 space-y-3">
+                    <h4 class="font-serif text-md font-bold text-champagne-200"><i class="fa-solid fa-qrcode mr-1.5 text-champagne-400"></i>Настройка QR-кода</h4>
+                    <div>
+                        <label class="block text-[11px] text-stone-400 mb-1">Ссылка на этот сайт (для QR-кода):</label>
+                        <input id="cfg-site-url" type="text" placeholder="https://username.github.io/wedding-camera" class="w-full px-3 py-2 rounded-lg bg-stone-900 border border-stone-700 text-xs text-stone-200 font-mono">
+                    </div>
+                    <div class="flex space-x-2">
+                        <button onclick="saveSiteUrlConfig()" class="flex-1 py-2 rounded-lg bg-stone-800 border border-stone-700 text-xs text-champagne-300 font-semibold">
+                            Обновить QR
+                        </button>
+                        <button onclick="openQrModal()" class="flex-1 py-2 rounded-lg bg-champagne-500/20 border border-champagne-500/40 text-xs text-champagne-200 font-semibold">
+                            Открыть QR
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Settings & Customization -->
                 <div class="p-4 rounded-2xl glass-panel border border-stone-800 space-y-3">
-                    <h4 class="font-serif text-md font-bold text-champagne-200">Текст на Рамках</h4>
+                    <h4 class="font-serif text-md font-bold text-champagne-200"><i class="fa-solid fa-pen-to-square mr-1.5 text-champagne-400"></i>Текст на снимках</h4>
                     <div>
-                        <label class="block text-[11px] text-stone-400 mb-1">Имена молодоженов</label>
+                        <label class="block text-[11px] text-stone-400 mb-1">Имена новобрачных</label>
                         <input id="cfg-wedding-names" type="text" value="Анвар & Угилжон" class="w-full px-3 py-2 rounded-lg bg-stone-900 border border-stone-700 text-xs text-stone-200">
                     </div>
                     <div>
@@ -364,31 +388,31 @@
                         <input id="cfg-wedding-date" type="text" value="09.11.2026" class="w-full px-3 py-2 rounded-lg bg-stone-900 border border-stone-700 text-xs text-stone-200">
                     </div>
                     <button onclick="saveWeddingSettings()" class="w-full py-2 rounded-lg bg-stone-800 border border-stone-700 text-xs text-champagne-300 font-semibold">
-                        Сохранить Изменения
+                        Сохранить изменения
                     </button>
                 </div>
             </div>
         </main>
     </div>
 
-    <!-- MODAL 1: ANDROID PERMISSION TROUBLESHOOTER -->
+    <!-- MODAL 1: ANDROID PERMISSION GUIDE -->
     <div id="modal-permission-guide" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-300">
         <div class="w-full max-w-sm glass-panel p-5 rounded-3xl border border-champagne-500/30 text-left max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-3 border-b border-stone-800 pb-2">
-                <h3 class="font-serif text-lg text-champagne-200 font-bold"><i class="fa-brands fa-android text-emerald-400 mr-2"></i>Инструкция по Камере</h3>
+                <h3 class="font-serif text-lg text-champagne-200 font-bold"><i class="fa-brands fa-android text-emerald-400 mr-2"></i>Доступ к камере</h3>
                 <button onclick="closeModal('modal-permission-guide')" class="text-stone-400 hover:text-white">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
 
-            <p class="text-xs text-stone-300 mb-4 leading-relaxed">Если браузер на Android блокирует камеру, выполните простые шаги:</p>
+            <p class="text-xs text-stone-300 mb-4 leading-relaxed">Если браузер не открывает камеру:</p>
 
             <div class="space-y-3 text-xs mb-5">
                 <div class="p-3 bg-stone-900/90 rounded-xl border border-stone-800 flex items-start space-x-3">
                     <span class="w-5 h-5 rounded-full bg-champagne-500/20 text-champagne-400 font-bold flex items-center justify-center text-[10px] flex-shrink-0">1</span>
                     <div>
                         <strong class="text-champagne-200 block mb-0.5">Значок замочка в строке URL</strong>
-                        <p class="text-stone-400 text-[11px]">Нажмите на иконку замочка или настроек слева от адреса сайта и включите пункт «Камера».</p>
+                        <p class="text-stone-400 text-[11px]">Нажмите на иконку замочка слева от адреса сайта и разрешите пункт «Камера».</p>
                     </div>
                 </div>
 
@@ -396,25 +420,17 @@
                     <span class="w-5 h-5 rounded-full bg-champagne-500/20 text-champagne-400 font-bold flex items-center justify-center text-[10px] flex-shrink-0">2</span>
                     <div>
                         <strong class="text-champagne-200 block mb-0.5">Настройки Android</strong>
-                        <p class="text-stone-400 text-[11px]">Настройки телефона ➔ Приложения ➔ Chrome (или ваш браузер) ➔ Разрешения ➔ Камера ➔ «Разрешить».</p>
-                    </div>
-                </div>
-
-                <div class="p-3 bg-stone-900/90 rounded-xl border border-stone-800 flex items-start space-x-3">
-                    <span class="w-5 h-5 rounded-full bg-champagne-500/20 text-champagne-400 font-bold flex items-center justify-center text-[10px] flex-shrink-0">3</span>
-                    <div>
-                        <strong class="text-champagne-200 block mb-0.5">Или просто используйте штатную камеру</strong>
-                        <p class="text-stone-400 text-[11px]">Вы можете переключиться на стандартное приложение камеры вашего смартфона.</p>
+                        <p class="text-stone-400 text-[11px]">Настройки ➔ Приложения ➔ Chrome ➔ Разрешения ➔ Камера ➔ Разрешить.</p>
                     </div>
                 </div>
             </div>
 
             <div class="space-y-2">
                 <button onclick="initCamera(); closeModal('modal-permission-guide');" class="w-full py-2.5 rounded-full bg-champagne-500 text-stone-950 font-bold text-xs uppercase tracking-wider">
-                    Повторить запрос камеры
+                    Включить камеру
                 </button>
-                <button onclick="switchToNativeFallbackEngine('Выбран режим стандартной камеры.'); closeModal('modal-permission-guide');" class="w-full py-2.5 rounded-full bg-stone-800 text-stone-300 font-semibold text-xs border border-stone-700">
-                    Режим встроенной камеры Android
+                <button onclick="switchToNativeFallbackEngine('Используется стандартное приложение камеры.'); closeModal('modal-permission-guide');" class="w-full py-2.5 rounded-full bg-stone-800 text-stone-300 font-semibold text-xs border border-stone-700">
+                    Режим встроенной камеры
                 </button>
             </div>
         </div>
@@ -428,13 +444,13 @@
             </div>
             <h3 class="font-serif text-lg text-amber-200 font-bold mb-1">Откройте в Chrome / Safari</h3>
             <p class="text-xs text-stone-300 mb-4 leading-relaxed">
-                Встроенные браузеры мессенджеров (Telegram, Viber, VK) часто запрещают доступ к видеокамере.
+                Встроенные браузеры мессенджеров (Telegram, WhatsApp, VK) блокируют видеокамеру.
             </p>
             <div class="space-y-2">
                 <button onclick="copyCurrentUrl()" class="w-full py-2.5 rounded-full bg-amber-500 text-stone-950 font-bold text-xs uppercase tracking-wider">
                     <i class="fa-regular fa-copy mr-1"></i> Скопировать ссылку
                 </button>
-                <p class="text-[10px] text-stone-400">Затем вставьте её в Google Chrome на вашем Android</p>
+                <p class="text-[10px] text-stone-400">Затем вставьте её в браузер Chrome на телефоне</p>
                 <button onclick="closeModal('modal-inapp')" class="mt-2 text-xs text-stone-400 hover:text-white underline">
                     Продолжить здесь
                 </button>
@@ -450,7 +466,7 @@
             </div>
             <h3 class="font-serif text-2xl text-champagne-100 font-bold mb-2">Все 15 кадров сделаны!</h3>
             <p class="text-xs text-stone-300 leading-relaxed mb-6">
-                Спасибо за отличные снимки! Все ваши кадры успешно сохранены в общем свадебном архиве.
+                Спасибо за отличные снимки! Все ваши фотографии успешно сохранены в общем свадебном архиве.
             </p>
             <button onclick="closeModal('modal-finished'); switchTab('album');" class="w-full py-3 rounded-full bg-gradient-to-r from-champagne-500 to-champagne-600 text-stone-950 font-bold text-xs uppercase tracking-widest shadow-xl">
                 Перейти к альбому
@@ -479,17 +495,34 @@
         </div>
     </div>
 
-    <!-- MODAL 5: SHARE QR -->
-    <div id="modal-qr" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-300">
-        <div class="w-full max-w-xs glass-panel p-5 rounded-3xl border border-champagne-500/30 text-center">
-            <h3 class="font-serif text-lg text-champagne-200 font-bold mb-1">Поделиться Камерой</h3>
-            <p class="text-[11px] text-stone-400 mb-3">Дайте гостю отсканировать QR-код</p>
+    <!-- MODAL 5: HIGH-CONTRAST QR CODE & PRINT CARD -->
+    <div id="modal-qr" class="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-300">
+        <div class="w-full max-w-sm glass-panel p-5 rounded-3xl border border-champagne-500/40 text-center max-h-[92vh] overflow-y-auto">
             
-            <div id="qr-container" class="bg-white p-3 rounded-2xl inline-block mb-3 shadow-xl"></div>
+            <div id="printable-card" class="bg-white p-5 rounded-2xl text-stone-950 shadow-2xl mb-4 border border-stone-300">
+                <p class="font-serif text-lg font-bold text-amber-900 leading-tight">❤️ <span id="card-names">Анвар & Угилжон</span></p>
+                <p class="text-[10px] text-stone-500 font-mono tracking-widest uppercase mb-3" id="card-date">09.11.2026</p>
+                
+                <!-- Standard High-Contrast Black/White QR Image -->
+                <div class="bg-white p-2 border-2 border-stone-900 rounded-xl inline-block shadow-inner mb-2">
+                    <canvas id="qr-canvas" class="w-52 h-52 mx-auto block"></canvas>
+                </div>
 
-            <button onclick="closeModal('modal-qr')" class="w-full py-2 rounded-full bg-stone-800 border border-stone-700 text-stone-300 font-semibold text-xs">
-                Закрыть
-            </button>
+                <p class="text-xs font-bold text-stone-800 mb-1">Свадебная Фотокамера</p>
+                <p class="text-[10px] text-stone-600 leading-tight">Наведите камеру телефона на QR-код и делайте снимки для общего архива!</p>
+            </div>
+
+            <div class="space-y-2">
+                <button onclick="window.print()" class="w-full py-2.5 rounded-full bg-champagne-500 text-stone-950 font-bold text-xs uppercase tracking-wider shadow-lg">
+                    <i class="fa-solid fa-print mr-1"></i> Распечатать карточку на стол
+                </button>
+                <button onclick="copyCurrentUrl()" class="w-full py-2 rounded-full bg-stone-800 text-stone-300 font-semibold text-xs border border-stone-700">
+                    <i class="fa-regular fa-copy mr-1"></i> Скопировать ссылку
+                </button>
+                <button onclick="closeModal('modal-qr')" class="w-full py-2 text-xs text-stone-400 hover:text-white">
+                    Закрыть
+                </button>
+            </div>
         </div>
     </div>
 
@@ -497,7 +530,7 @@
     <div id="modal-name" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-300">
         <div class="w-full max-w-xs glass-panel p-5 rounded-3xl border border-champagne-500/30 text-center">
             <h3 class="font-serif text-lg text-champagne-200 font-bold mb-1">Представьтесь ✨</h3>
-            <p class="text-xs text-stone-400 mb-4">Укажите ваше имя или фамилию</p>
+            <p class="text-xs text-stone-400 mb-4">Укажите ваше имя или подпись к снимкам</p>
             
             <input id="input-guest-name" type="text" placeholder="Ваше Имя / Семья" class="w-full px-4 py-2.5 rounded-xl bg-stone-900 border border-stone-700 text-sm text-stone-100 mb-4 focus:outline-none focus:border-champagne-500">
 
@@ -507,137 +540,46 @@
         </div>
     </div>
 
-    <!-- Hidden Canvas for Watermark & Frame Processing -->
+    <!-- Hidden Canvas -->
     <canvas id="hidden-canvas" class="hidden"></canvas>
 
     <!-- JAVASCRIPT APPLICATION LOGIC -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Application Constants & Firebase Setup
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'wedding-camera-app';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' 
-            ? JSON.parse(__firebase_config) 
-            : { apiKey: "demo-api-key", authDomain: "demo.firebaseapp.com", projectId: "demo-project" };
-
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-
+    <script>
         // App State Variables
         const MAX_SHOTS = 15;
-        let currentUser = null;
-        let activeEngine = 'live'; // 'live' or 'native'
+        let activeEngine = 'live';
         let guestId = localStorage.getItem('wedding_guest_id') || ('guest_' + Math.random().toString(36).substring(2, 9));
         localStorage.setItem('wedding_guest_id', guestId);
 
         let guestName = localStorage.getItem('wedding_guest_name') || 'Гость';
         let shotsTaken = parseInt(localStorage.getItem(`wedding_shots_${guestId}`) || '0', 10);
-        let localPhotosList = [];
+        let guestPhotos = JSON.parse(localStorage.getItem(`wedding_local_photos_${guestId}`) || '[]');
 
         let stream = null;
         let facingMode = "environment";
         let frameStyleIndex = 0;
         const frameStyles = [
-            { name: "Классик", border: true, textColor: "#F4EAD3" },
-            { name: "Золотой", border: true, textColor: "#D4AF37" },
-            { name: "Чистый", border: false, textColor: "#FFFFFF" }
+            { name: "КЛАССИК", border: true, textColor: "#F4EAD3" },
+            { name: "ЗОЛОТОЙ", border: true, textColor: "#D4AF37" },
+            { name: "ЧИСТЫЙ", border: false, textColor: "#FFFFFF" }
         ];
 
         let weddingSettings = {
             names: localStorage.getItem('wedding_cfg_names') || "Анвар & Угилжон",
-            date: localStorage.getItem('wedding_cfg_date') || "09.11.2026"
+            date: localStorage.getItem('wedding_cfg_date') || "09.11.2026",
+            siteUrl: localStorage.getItem('wedding_cfg_url') || window.location.href
         };
 
-        let cloudPhotosList = [];
-
-        const IDB_NAME = 'WeddingCameraDB';
-        const IDB_VERSION = 1;
-        const STORE_NAME = 'photos';
-
-        function openPhotoDB() {
-            return new Promise((resolve, reject) => {
-                const request = indexedDB.open(IDB_NAME, IDB_VERSION);
-                request.onupgradeneeded = (e) => {
-                    const idb = e.target.result;
-                    if (!idb.objectStoreNames.contains(STORE_NAME)) {
-                        const store = idb.createObjectStore(STORE_NAME, { keyPath: 'id' });
-                        store.createIndex('timestamp', 'timestamp', { unique: false });
-                        store.createIndex('guestId', 'guestId', { unique: false });
-                    }
-                };
-                request.onsuccess = (e) => resolve(e.target.result);
-                request.onerror = (e) => reject(e.target.error);
-            });
-        }
-
-        async function saveLocalPhotoIDB(photoObj) {
-            try {
-                const idb = await openPhotoDB();
-                const tx = idb.transaction(STORE_NAME, 'readwrite');
-                const store = tx.objectStore(STORE_NAME);
-                await new Promise((resolve, reject) => {
-                    const req = store.put(photoObj);
-                    req.onsuccess = () => resolve();
-                    req.onerror = () => reject(req.error);
-                });
-            } catch (e) {
-                console.warn("IndexedDB Save Warning:", e);
-            }
-        }
-
-        async function getLocalPhotosIDB() {
-            try {
-                const idb = await openPhotoDB();
-                const tx = idb.transaction(STORE_NAME, 'readonly');
-                const store = tx.objectStore(STORE_NAME);
-                return new Promise((resolve) => {
-                    const req = store.getAll();
-                    req.onsuccess = () => {
-                        const res = req.result || [];
-                        res.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-                        resolve(res);
-                    };
-                    req.onerror = () => resolve([]);
-                });
-            } catch (e) {
-                return [];
-            }
-        }
-
-        window.addEventListener('DOMContentLoaded', async () => {
-            localPhotosList = await getLocalPhotosIDB();
-            shotsTaken = Math.max(shotsTaken, localPhotosList.filter(p => p.guestId === guestId).length);
-            localStorage.setItem(`wedding_shots_${guestId}`, shotsTaken.toString());
-
+        window.addEventListener('DOMContentLoaded', () => {
             updateShotsCounterUI();
             updateGuestNameUI();
             applyWeddingSettingsUI();
             renderMiniGallery();
-            setupQRCode();
+            renderSharedAlbumFromLocal();
             runDiagnostics();
-
-            // Firebase Auth Setup
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    const userCred = await signInWithCustomToken(auth, __initial_auth_token);
-                    currentUser = userCred.user;
-                } else {
-                    const userCred = await signInAnonymously(auth);
-                    currentUser = userCred.user;
-                }
-                listenToPublicPhotos();
-            } catch (err) {
-                console.warn("Firebase Auth fallback mode:", err);
-            }
-
-            // Auto-initialize camera on load
             initCamera();
         });
 
-        // Diagnostic checks for Android and secure context
         function runDiagnostics() {
             const isSecure = window.isSecureContext || location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
             const ua = navigator.userAgent || navigator.vendor || window.opera;
@@ -646,22 +588,17 @@
             if (!isSecure) {
                 document.getElementById('http-warning-banner').classList.remove('hidden');
             }
-
             if (isInApp) {
                 document.getElementById('inapp-browser-banner').classList.remove('hidden');
             }
         }
 
+        // Camera Engine 1: Live Stream
         window.initCamera = async function() {
             const isSecure = window.isSecureContext || location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
             
-            if (!isSecure) {
-                switchToNativeFallbackEngine("Требуется HTTPS. Включена встроенная камера Android.");
-                return;
-            }
-
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                switchToNativeFallbackEngine("Ваш браузер не поддерживает прямое видео. Включена встроенная камера.");
+            if (!isSecure || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                switchToNativeFallbackEngine("Требуется HTTPS. Включена стандартная камера.");
                 return;
             }
 
@@ -669,7 +606,6 @@
                 stream.getTracks().forEach(track => track.stop());
             }
 
-            // Constraints fallback chain for Android compatibility
             const constraintOptions = [
                 { video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } } },
                 { video: { facingMode: facingMode } },
@@ -692,12 +628,12 @@
                     success = true;
                     break;
                 } catch (e) {
-                    console.warn("Constraint failed:", constraints, e);
+                    console.warn("Camera constraint error:", e);
                 }
             }
 
             if (!success) {
-                switchToNativeFallbackEngine("Доступ к трансляции ограничен. Включен режим стандартной камеры.");
+                switchToNativeFallbackEngine("Доступ к трансляции ограничен. Включена встроенная камера.");
             }
         };
 
@@ -714,14 +650,16 @@
             if (reason) {
                 document.getElementById('fallback-reason-text').innerText = reason;
             }
-            updateEngineBadge("Стандартная камера Android", "bg-amber-400");
+            updateEngineBadge("Камера телефона", "bg-amber-400");
         };
 
         function updateEngineBadge(text, colorClass) {
             const badgeText = document.getElementById('engine-status-text');
             const badgeDot = document.getElementById('engine-status-badge').firstElementChild;
-            badgeText.innerText = text;
-            badgeDot.className = `w-2 h-2 rounded-full ${colorClass} inline-block`;
+            if (badgeText && badgeDot) {
+                badgeText.innerText = text;
+                badgeDot.className = `w-2 h-2 rounded-full ${colorClass} inline-block`;
+            }
         }
 
         window.switchCameraFacing = function() {
@@ -729,7 +667,7 @@
             if (activeEngine === 'live') {
                 initCamera();
             } else {
-                showToast("В режиме стандартной камеры выбор осуществляется внутри приложения камеры.");
+                showToast("Выбор камеры осуществляется в приложении камеры.");
             }
         };
 
@@ -739,6 +677,7 @@
             showToast(`Рамка: ${frameStyles[frameStyleIndex].name}`);
         };
 
+        // Main Shutter Trigger
         window.triggerShutter = function() {
             if (shotsTaken >= MAX_SHOTS) {
                 openModal('modal-finished');
@@ -748,12 +687,10 @@
             if (activeEngine === 'live') {
                 takeLivePhoto();
             } else {
-                // Click hidden Android file input
                 document.getElementById('native-camera-input').click();
             }
         };
 
-        // Capture photo from Live Video Stream
         function takeLivePhoto() {
             playShutterSound();
             triggerFlash();
@@ -762,42 +699,24 @@
             const canvas = document.getElementById('hidden-canvas');
             const ctx = canvas.getContext('2d');
 
-            const sourceW = video.videoWidth || 1080;
-            const sourceH = video.videoHeight || 1440;
-
-            // Image Compression Optimization: Downscale to max 1200px
-            const maxDim = 1200;
-            let targetW = sourceW;
-            let targetH = sourceH;
-
-            if (targetW > maxDim || targetH > maxDim) {
-                if (targetW > targetH) {
-                    targetH = Math.round((targetH * maxDim) / targetW);
-                    targetW = maxDim;
-                } else {
-                    targetW = Math.round((targetW * maxDim) / targetH);
-                    targetH = maxDim;
-                }
-            }
-
-            canvas.width = targetW;
-            canvas.height = targetH;
+            const width = video.videoWidth || 1080;
+            const height = video.videoHeight || 1440;
+            canvas.width = width;
+            canvas.height = height;
 
             if (facingMode === "user") {
-                ctx.translate(targetW, 0);
+                ctx.translate(width, 0);
                 ctx.scale(-1, 1);
             }
-            ctx.drawImage(video, 0, 0, targetW, targetH);
+            ctx.drawImage(video, 0, 0, width, height);
             ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-            applyCanvasWeddingOverlay(ctx, targetW, targetH);
+            applyCanvasWeddingOverlay(ctx, width, height);
 
-            // Compress to 0.78 quality (~150-250 KB)
             const photoDataUrl = canvas.toDataURL('image/jpeg', 0.78);
             savePhotoEntry(photoDataUrl);
         }
 
-        // Handle native Android input capture change
         window.handleNativeCameraCapture = function(event) {
             const file = event.target.files && event.target.files[0];
             if (!file) return;
@@ -812,31 +731,26 @@
                 const canvas = document.getElementById('hidden-canvas');
                 const ctx = canvas.getContext('2d');
                 
-                const sourceW = img.width;
-                const sourceH = img.height;
-
-                // Image Compression Optimization: Downscale to max 1200px
+                // Max scale to 1200px
+                let w = img.width;
+                let h = img.height;
                 const maxDim = 1200;
-                let targetW = sourceW;
-                let targetH = sourceH;
-
-                if (targetW > maxDim || targetH > maxDim) {
-                    if (targetW > targetH) {
-                        targetH = Math.round((targetH * maxDim) / targetW);
-                        targetW = maxDim;
+                if (w > maxDim || h > maxDim) {
+                    if (w > h) {
+                        h = Math.round((h * maxDim) / w);
+                        w = maxDim;
                     } else {
-                        targetW = Math.round((targetW * maxDim) / targetH);
-                        targetH = maxDim;
+                        w = Math.round((w * maxDim) / h);
+                        h = maxDim;
                     }
                 }
 
-                canvas.width = targetW;
-                canvas.height = targetH;
+                canvas.width = w;
+                canvas.height = h;
 
-                ctx.drawImage(img, 0, 0, targetW, targetH);
-                applyCanvasWeddingOverlay(ctx, targetW, targetH);
+                ctx.drawImage(img, 0, 0, w, h);
+                applyCanvasWeddingOverlay(ctx, w, h);
 
-                // Compress to 0.78 quality (~150-250 KB)
                 const photoDataUrl = canvas.toDataURL('image/jpeg', 0.78);
                 URL.revokeObjectURL(url);
 
@@ -849,46 +763,46 @@
         function applyCanvasWeddingOverlay(ctx, w, h) {
             const currentStyle = frameStyles[frameStyleIndex];
 
-            // 1. Subtle warm photo filter
+            // 1. Warm Filter Overlay
             ctx.fillStyle = "rgba(244, 234, 211, 0.03)";
             ctx.fillRect(0, 0, w, h);
 
-            // 2. Draw border frame
+            // 2. Frame Border
             if (currentStyle.border) {
-                ctx.strokeStyle = "rgba(212, 175, 55, 0.65)";
-                ctx.lineWidth = Math.max(8, Math.round(w * 0.016));
+                ctx.strokeStyle = "rgba(212, 175, 55, 0.6)";
+                ctx.lineWidth = Math.max(8, w * 0.015);
                 ctx.strokeRect(ctx.lineWidth / 2, ctx.lineWidth / 2, w - ctx.lineWidth, h - ctx.lineWidth);
             }
 
-            // 3. Draw Watermark Ribbon
-            const ribbonHeight = Math.max(60, Math.round(h * 0.085));
+            // 3. Watermark Ribbon
+            const ribbonHeight = Math.max(60, h * 0.08);
             const gradient = ctx.createLinearGradient(0, h - ribbonHeight, 0, h);
             gradient.addColorStop(0, "rgba(0,0,0,0)");
-            gradient.addColorStop(1, "rgba(18,16,14,0.88)");
+            gradient.addColorStop(1, "rgba(18,16,14,0.92)");
 
             ctx.fillStyle = gradient;
             ctx.fillRect(0, h - ribbonHeight, w, ribbonHeight);
 
-            // Draw Text
+            // 4. Text
             ctx.fillStyle = currentStyle.textColor;
             ctx.textAlign = "center";
             
-            const titleFontSize = Math.max(16, Math.round(w * 0.036));
+            const titleFontSize = Math.max(16, Math.round(w * 0.035));
             ctx.font = `italic bold ${titleFontSize}px "Cormorant Garamond", serif`;
             ctx.fillText(`❤️ ${weddingSettings.names}`, w / 2, h - (ribbonHeight * 0.45));
 
             const subFontSize = Math.max(10, Math.round(w * 0.020));
             ctx.font = `${subFontSize}px "Montserrat", sans-serif`;
             ctx.fillStyle = "rgba(244, 234, 211, 0.85)";
-            ctx.fillText(`${weddingSettings.date} • Photo by ${guestName}`, w / 2, h - (ribbonHeight * 0.18));
+            ctx.fillText(`${weddingSettings.date} • Фото: ${guestName}`, w / 2, h - (ribbonHeight * 0.20));
         }
 
-        async function savePhotoEntry(photoDataUrl) {
+        function savePhotoEntry(photoDataUrl) {
             shotsTaken++;
             localStorage.setItem(`wedding_shots_${guestId}`, shotsTaken.toString());
             
             const newPhotoObj = {
-                id: Date.now().toString() + '_' + Math.random().toString(36).substring(2, 6),
+                id: Date.now().toString(),
                 photoData: photoDataUrl,
                 timestamp: Date.now(),
                 guestId: guestId,
@@ -896,76 +810,37 @@
                 photoNumber: shotsTaken
             };
 
-            // 1. Guaranteed Local Save in IndexedDB
-            await saveLocalPhotoIDB(newPhotoObj);
-            localPhotosList.unshift(newPhotoObj);
-
-            // 2. Background Sync to Cloud
-            syncPhotoToCloud(newPhotoObj);
+            guestPhotos.unshift(newPhotoObj);
+            try {
+                localStorage.setItem(`wedding_local_photos_${guestId}`, JSON.stringify(guestPhotos));
+            } catch (e) {
+                console.warn("Storage quota limit reached:", e);
+            }
 
             updateShotsCounterUI();
             renderMiniGallery();
-            refreshSharedAlbum();
-
-            showToast(`Фото № ${shotsTaken} сохранено в архив! 📸`);
+            renderSharedAlbumFromLocal();
 
             if (shotsTaken >= MAX_SHOTS) {
-                setTimeout(() => openModal('modal-finished'), 600);
+                setTimeout(() => openModal('modal-finished'), 400);
+            } else {
+                showToast(`Снимок ${shotsTaken} из ${MAX_SHOTS} сохранен!`);
             }
         }
 
-        // Sync to Firestore
-        async function syncPhotoToCloud(photoObj) {
-            if (!currentUser) return;
-            try {
-                // Rule 1: /artifacts/{appId}/public/data/wedding_photos
-                const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'wedding_photos');
-                await addDoc(colRef, photoObj);
-            } catch (e) {
-                console.warn("Firestore sync background notice:", e);
-            }
-        }
-
-        function listenToPublicPhotos() {
-            if (!currentUser) return;
-            const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'wedding_photos');
-
-            onSnapshot(colRef, (snapshot) => {
-                const photos = [];
-                snapshot.forEach((doc) => photos.push({ docId: doc.id, ...doc.data() }));
-                cloudPhotosList = photos;
-                refreshSharedAlbum();
-            }, (error) => {
-                console.warn("Snapshot error:", error);
-            });
-        }
-
-        window.refreshSharedAlbum = function() {
-            // Merge local IDB photos with cloud photos (deduplicate by id)
-            const map = new Map();
-            localPhotosList.forEach(p => map.set(p.id, p));
-            cloudPhotosList.forEach(p => map.set(p.id, p));
-
-            const combined = Array.from(map.values());
-            combined.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-
-            renderSharedAlbum(combined);
-            updateAdminStats(combined);
-        };
-
-        function renderSharedAlbum(photos) {
+        function renderSharedAlbumFromLocal() {
             const grid = document.getElementById('shared-album-grid');
-            if (!photos || photos.length === 0) {
+            if (!guestPhotos || guestPhotos.length === 0) {
                 grid.innerHTML = `
                     <div class="col-span-2 py-16 text-center text-stone-500 glass-panel rounded-2xl">
                         <i class="fa-solid fa-camera-retro text-3xl mb-2 text-stone-600"></i>
-                        <p class="text-xs">В архиве пока нет снимков.<br>Будьте первым!</p>
+                        <p class="text-xs">В альбоме пока нет снимков.<br>Сделайте ваш первый кадр!</p>
                     </div>
                 `;
                 return;
             }
 
-            grid.innerHTML = photos.map(p => `
+            grid.innerHTML = guestPhotos.map(p => `
                 <div onclick="openLightbox('${p.photoData.replace(/'/g, "\\'")}', '${(p.guestName || 'Гость').replace(/'/g, "\\'")}')" class="relative group aspect-[3/4] rounded-2xl overflow-hidden bg-stone-900 border border-stone-800 shadow-md cursor-pointer hover:border-champagne-500/50 transition">
                     <img src="${p.photoData}" alt="Guest Shot" class="w-full h-full object-cover">
                     <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-90 flex flex-col justify-end p-2.5">
@@ -974,25 +849,26 @@
                     </div>
                 </div>
             `).join('');
+
+            document.getElementById('stat-total-photos').innerText = guestPhotos.length;
+            document.getElementById('stat-total-guests').innerText = "1";
         }
 
         function renderMiniGallery() {
             const gallery = document.getElementById('mini-gallery');
-            const myPhotos = localPhotosList.filter(p => p.guestId === guestId);
-
-            if (myPhotos.length === 0) {
-                gallery.innerHTML = `<div class="text-[11px] text-stone-500 italic py-2 text-center w-full">Сделайте ваш первый кадр!</div>`;
+            if (guestPhotos.length === 0) {
+                gallery.innerHTML = `<div class="text-[11px] text-stone-500 italic py-1 text-center w-full">Сделайте ваш первый кадр!</div>`;
                 return;
             }
 
-            gallery.innerHTML = myPhotos.map(p => `
-                <div onclick="openLightbox('${p.photoData}', '${guestName}')" class="flex-shrink-0 w-11 h-11 rounded-lg overflow-hidden border border-champagne-500/40 cursor-pointer active:scale-95 transition">
+            gallery.innerHTML = guestPhotos.map(p => `
+                <div onclick="openLightbox('${p.photoData}', '${guestName}')" class="flex-shrink-0 w-10 h-10 rounded-lg overflow-hidden border border-champagne-500/40 cursor-pointer active:scale-95 transition">
                     <img src="${p.photoData}" class="w-full h-full object-cover">
                 </div>
             `).join('');
         }
 
-        // Web Audio Shutter Synthesizer
+        // Web Audio Shutter Sound
         function playShutterSound() {
             try {
                 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1035,29 +911,30 @@
 
             const tabCamBtn = document.getElementById('tab-camera');
             const tabAlbBtn = document.getElementById('tab-album');
+            const tabAdmBtn = document.getElementById('tab-admin');
 
             cameraView.classList.add('hidden');
             albumView.classList.add('hidden');
             adminView.classList.add('hidden');
 
-            tabCamBtn.className = "px-3 py-1.5 rounded-full text-xs font-medium text-stone-300 hover:text-white transition-all duration-200";
-            tabAlbBtn.className = "px-3 py-1.5 rounded-full text-xs font-medium text-stone-300 hover:text-white transition-all duration-200";
+            tabCamBtn.className = "px-2.5 py-1.5 rounded-full text-xs font-medium text-stone-300 hover:text-white transition-all duration-200";
+            tabAlbBtn.className = "px-2.5 py-1.5 rounded-full text-xs font-medium text-stone-300 hover:text-white transition-all duration-200";
+            tabAdmBtn.className = "px-2.5 py-1.5 rounded-full text-xs font-medium text-amber-300 hover:text-amber-200 transition-all duration-200 bg-amber-500/10 border border-amber-500/30";
 
             if (tabName === 'camera') {
                 cameraView.classList.remove('hidden');
-                tabCamBtn.className = "px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 bg-champagne-500 text-stone-950 font-semibold shadow-md";
+                tabCamBtn.className = "px-2.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 bg-champagne-500 text-stone-950 shadow-md";
             } else if (tabName === 'album') {
-                refreshSharedAlbum();
                 albumView.classList.remove('hidden');
                 albumView.classList.add('flex');
-                tabAlbBtn.className = "px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 bg-champagne-500 text-stone-950 font-semibold shadow-md";
+                tabAlbBtn.className = "px-2.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 bg-champagne-500 text-stone-950 shadow-md";
             } else if (tabName === 'admin') {
                 adminView.classList.remove('hidden');
                 adminView.classList.add('flex');
+                tabAdmBtn.className = "px-2.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 bg-amber-500 text-stone-950 shadow-md";
             }
         };
 
-        // Custom Toast Notification System
         window.showToast = function(msg) {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
@@ -1071,7 +948,6 @@
             }, 2500);
         };
 
-        // Utility UI Helpers
         function updateShotsCounterUI() {
             const remaining = Math.max(0, MAX_SHOTS - shotsTaken);
             document.getElementById('shots-counter').innerText = `${remaining} / ${MAX_SHOTS}`;
@@ -1096,9 +972,12 @@
             document.getElementById('overlay-frame-title').innerText = `❤️ ${weddingSettings.names}`;
             document.getElementById('cfg-wedding-names').value = weddingSettings.names;
             document.getElementById('cfg-wedding-date').value = weddingSettings.date;
+            document.getElementById('cfg-site-url').value = weddingSettings.siteUrl;
+
+            document.getElementById('card-names').innerText = weddingSettings.names;
+            document.getElementById('card-date').innerText = weddingSettings.date;
         }
 
-        // Modal triggers
         window.openLightbox = function(imgSrc, author) {
             document.getElementById('lightbox-img').src = imgSrc;
             document.getElementById('lightbox-author').innerText = `Фото от: ${author}`;
@@ -1111,7 +990,12 @@
 
         window.openPermissionGuideModal = () => openModal('modal-permission-guide');
         window.openInAppModal = () => openModal('modal-inapp');
-        window.openQrModal = () => openModal('modal-qr');
+        
+        window.openQrModal = function() {
+            renderHighContrastQR();
+            openModal('modal-qr');
+        };
+
         window.promptGuestName = () => openModal('modal-name');
 
         window.saveGuestName = function() {
@@ -1126,24 +1010,46 @@
         };
 
         window.copyCurrentUrl = function() {
+            const urlToCopy = weddingSettings.siteUrl || window.location.href;
             const el = document.createElement('textarea');
-            el.value = window.location.href;
+            el.value = urlToCopy;
             document.body.appendChild(el);
             el.select();
             document.execCommand('copy');
             document.body.removeChild(el);
-            showToast("Ссылка скопирована! Вставьте её в Chrome.");
+            showToast("Ссылка скопирована!");
         };
 
-        function setupQRCode() {
-            const container = document.getElementById('qr-container');
-            const url = window.location.href;
-            container.innerHTML = `
-                <div class="flex flex-col items-center justify-center text-stone-950 p-1">
-                    <i class="fa-solid fa-qrcode text-7xl mb-1"></i>
-                    <span class="text-[9px] font-mono font-bold truncate max-w-[130px]">${url.replace('https://', '')}</span>
-                </div>
-            `;
+        // Render Standard High-Contrast QR Code to Canvas
+        function renderHighContrastQR() {
+            const canvas = document.getElementById('qr-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const targetUrl = weddingSettings.siteUrl || window.location.href;
+
+            const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=15&data=${encodeURIComponent(targetUrl)}`;
+            
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.onload = () => {
+                canvas.width = 300;
+                canvas.height = 300;
+                ctx.drawImage(img, 0, 0, 300, 300);
+            };
+            img.onerror = () => {
+                // High contrast fallback text
+                canvas.width = 300;
+                canvas.height = 300;
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, 300, 300);
+                ctx.fillStyle = '#000000';
+                ctx.font = 'bold 16px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText("Свадебная Камера", 150, 130);
+                ctx.font = '12px monospace';
+                ctx.fillText(targetUrl.substring(0, 35), 150, 160);
+            };
+            img.src = qrApiUrl;
         }
 
         window.authenticateAdmin = function() {
@@ -1153,15 +1059,9 @@
                 document.getElementById('admin-dashboard-content').classList.remove('hidden');
                 document.getElementById('admin-dashboard-content').classList.add('flex');
             } else {
-                showToast("Неверный пин-код! Попробуйте 2026.");
+                showToast("Неверный ПИН-код! Введите 2026.");
             }
         };
-
-        function updateAdminStats(photos) {
-            document.getElementById('stat-total-photos').innerText = photos.length;
-            const uniqueGuests = new Set(photos.map(p => p.guestId || 'guest')).size;
-            document.getElementById('stat-total-guests').innerText = uniqueGuests;
-        }
 
         window.saveWeddingSettings = function() {
             const names = document.getElementById('cfg-wedding-names').value.trim();
@@ -1173,17 +1073,21 @@
             localStorage.setItem('wedding_cfg_date', weddingSettings.date);
 
             applyWeddingSettingsUI();
-            showToast("Настройки обновлены!");
+            showToast("Настройки сохранены!");
+        };
+
+        window.saveSiteUrlConfig = function() {
+            const urlVal = document.getElementById('cfg-site-url').value.trim();
+            if (urlVal) {
+                weddingSettings.siteUrl = urlVal;
+                localStorage.setItem('wedding_cfg_url', urlVal);
+                renderHighContrastQR();
+                showToast("Ссылка для QR-кода обновлена!");
+            }
         };
 
         window.downloadAllPhotosZip = async function() {
-            // Get all photos from IDB and Cloud
-            const map = new Map();
-            localPhotosList.forEach(p => map.set(p.id, p));
-            cloudPhotosList.forEach(p => map.set(p.id, p));
-            const allPhotos = Array.from(map.values());
-
-            if (allPhotos.length === 0) {
+            if (guestPhotos.length === 0) {
                 showToast("В альбоме пока нет снимков.");
                 return;
             }
@@ -1196,7 +1100,7 @@
                 const zip = new JSZip();
                 const folder = zip.folder("wedding_photos");
 
-                allPhotos.forEach((photo, idx) => {
+                guestPhotos.forEach((photo, idx) => {
                     if (photo.photoData) {
                         const base64Data = photo.photoData.replace(/^data:image\/(png|jpeg|jpg);base64,/, "");
                         const filename = `wedding_${photo.guestName || 'guest'}_${idx + 1}.jpg`;
@@ -1212,7 +1116,7 @@
                 showToast("Загрузка архива началась!");
             } catch (e) {
                 console.error("ZIP Error:", e);
-                showToast("Ошибка скачивания архива.");
+                showToast("Ошибка создания архива.");
             } finally {
                 btn.innerHTML = orig;
             }

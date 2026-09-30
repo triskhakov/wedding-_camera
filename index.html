@@ -711,7 +711,21 @@ if (track && track.getCapabilities && track.getCapabilities().zoom) {
                 ctx.translate(width, 0);
                 ctx.scale(-1, 1);
             }
-            ctx.drawImage(video, 0, 0, width, height);
+            const vWidth = video.videoWidth;
+const vHeight = video.videoHeight;
+const cWidth = canvas.width;
+const cHeight = canvas.height;
+const videoAspect = vWidth / vHeight;
+const canvasAspect = cWidth / cHeight;
+let sx = 0, sy = 0, sWidth = vWidth, sHeight = vHeight;
+if (videoAspect > canvasAspect) {
+    sWidth = vHeight * canvasAspect;
+    sx = (vWidth - sWidth) / 2;
+} else {
+    sHeight = vWidth / canvasAspect;
+    sy = (vHeight - sHeight) / 2;
+}
+ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, cWidth, cHeight);
             ctx.setTransform(1, 0, 0, 1, 0, 0);
 
             applyCanvasWeddingOverlay(ctx, width, height);

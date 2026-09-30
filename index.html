@@ -187,7 +187,7 @@
                 
                 <!-- Engine 1: Live Video Element -->
                 <div id="live-camera-container" class="w-full h-full relative flex items-center justify-center">
-                    <video id="camera-video" autoplay playsinline muted class="w-full h-full object-cover"></video>
+                    <video id="camera-video" autoplay playsinline muted class="w-full h-full object-contain"></video>
                 </div>
 
                 <!-- Engine 2: Native Android Fallback Container -->
@@ -619,7 +619,10 @@
                     const videoEl = document.getElementById('camera-video');
                     videoEl.srcObject = stream;
                     await videoEl.play();
-                    
+                    const track = stream.getVideoTracks()[0];
+if (track && track.getCapabilities && track.getCapabilities().zoom) {
+    track.applyConstraints({ advanced: [{ zoom: track.getCapabilities().zoom.min || 1 }] }).catch(() => {});
+}
                     document.getElementById('camera-placeholder').classList.add('hidden');
                     document.getElementById('fallback-camera-container').classList.add('hidden');
                     document.getElementById('live-camera-container').classList.remove('hidden');

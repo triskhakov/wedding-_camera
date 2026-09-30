@@ -138,24 +138,6 @@
             </div>
         </header>
 
-        <!-- DIAGNOSTIC BANNERS FOR ANDROID -->
-        <div id="inapp-browser-banner" class="hidden relative z-20 bg-amber-500/20 border-b border-amber-500/40 px-4 py-2 flex items-center justify-between text-xs text-amber-200">
-            <div class="flex items-center space-x-2">
-                <i class="fa-solid fa-triangle-exclamation text-amber-400 text-sm flex-shrink-0"></i>
-                <span>Открыто в мессенджере. Камера может быть заблокирована.</span>
-            </div>
-            <button onclick="openInAppModal()" class="ml-2 px-2.5 py-1 rounded-lg bg-amber-500 text-stone-950 font-bold text-[11px] flex-shrink-0">
-                Открыть в Chrome
-            </button>
-        </div>
-
-        <div id="http-warning-banner" class="hidden relative z-20 bg-rose-500/20 border-b border-rose-500/40 px-4 py-2 flex items-center justify-between text-xs text-rose-200">
-            <div class="flex items-center space-x-2">
-                <i class="fa-solid fa-lock-open text-rose-400 text-sm"></i>
-                <span>Включен стандартный режим съемки Android.</span>
-            </div>
-        </div>
-
         <!-- VIEW 1: CAMERA SCREEN -->
         <main id="view-camera" class="relative flex-1 flex flex-col justify-between overflow-hidden bg-black">
             
@@ -170,80 +152,38 @@
 
                 <!-- Camera Tools -->
                 <div class="pointer-events-auto flex space-x-2">
-                    <button onclick="openPermissionGuideModal()" class="w-9 h-9 rounded-full glass-panel flex items-center justify-center text-amber-300 border border-amber-500/40 active:scale-95 transition" title="Инструкция доступа">
+                    <button onclick="openPermissionGuideModal()" class="w-9 h-9 rounded-full glass-panel flex items-center justify-center text-amber-300 border border-amber-500/40 active:scale-95 transition" title="Инструкция">
                         <i class="fa-solid fa-circle-question text-xs"></i>
                     </button>
                     <button id="btn-toggle-frame" onclick="cycleFrameStyle()" class="w-9 h-9 rounded-full glass-panel flex items-center justify-center text-champagne-300 border border-champagne-500/30 active:scale-95 transition" title="Сменить рамку">
                         <i class="fa-solid fa-wand-magic-sparkles text-xs"></i>
                     </button>
-                    <button id="btn-flip-camera" onclick="switchCameraFacing()" class="w-9 h-9 rounded-full glass-panel flex items-center justify-center text-champagne-300 border border-champagne-500/30 active:scale-95 transition" title="Переключить камеру">
-                        <i class="fa-solid fa-camera-rotate text-xs"></i>
-                    </button>
                 </div>
             </div>
 
-            <!-- Viewfinder Area -->
-            <div class="relative w-full h-full flex items-center justify-center overflow-hidden bg-stone-950">
+            <!-- Viewfinder / Native Camera Target Area -->
+            <div class="relative w-full h-full flex items-center justify-center overflow-hidden bg-stone-950 p-6">
                 
-                <!-- Engine 1: Live Video Element -->
-                <div id="live-camera-container" class="w-full h-full relative flex items-center justify-center">
-                    <video id="camera-video" autoplay playsinline muted class="w-full h-full object-contain"></video>
-                </div>
-
-                <!-- Engine 2: Native Android Fallback Container -->
-                <div id="fallback-camera-container" class="hidden w-full h-full flex flex-col items-center justify-center p-6 text-center bg-stone-900/90 z-10">
-                    <div class="w-20 h-20 rounded-full bg-champagne-500/15 border border-champagne-500/40 flex items-center justify-center text-champagne-400 text-3xl mb-4">
-                        <i class="fa-solid fa-mobile-retro"></i>
+                <!-- Central Native Camera Card -->
+                <div onclick="triggerShutter()" class="w-full max-w-xs glass-gold rounded-3xl p-6 text-center border border-champagne-500/40 shadow-2xl cursor-pointer active:scale-98 transition flex flex-col items-center">
+                    <div class="w-20 h-20 rounded-full bg-champagne-500/15 border border-champagne-500/40 flex items-center justify-center text-champagne-400 text-3xl mb-4 shadow-inner">
+                        <i class="fa-solid fa-camera-retro"></i>
                     </div>
-                    <h3 class="font-serif text-xl text-champagne-200 mb-1">Режим Камеры Android</h3>
-                    <p class="text-xs text-stone-300 max-w-xs mb-4 leading-relaxed" id="fallback-reason-text">
-                        При нажатии на золотую кнопку откроется стандартная камера телефона. Снимок автоматически сохранится в архив свадьбы.
+                    <h3 class="font-serif text-2xl text-champagne-200 mb-2 font-bold">Свадебный Кадр</h3>
+                    <p class="text-xs text-stone-300 leading-relaxed mb-6">
+                        Нажмите сюда или на золотую кнопку внизу, чтобы открыть камеру телефона и сделать фото.
                     </p>
-                    <button onclick="triggerShutter()" class="px-6 py-2.5 rounded-full bg-gradient-to-r from-champagne-500 to-champagne-600 text-stone-950 font-bold text-xs uppercase tracking-wider shadow-lg active:scale-95 transition">
-                        <i class="fa-solid fa-camera mr-1"></i> Сделать кадр
-                    </button>
-                </div>
-
-                <!-- Wedding Canvas Overlay Framework -->
-                <div id="viewfinder-overlay" class="absolute inset-0 pointer-events-none flex flex-col justify-between p-5 border-[10px] border-stone-950/40 transition-all duration-300 z-10">
-                    <div class="flex justify-between items-start">
-                        <div class="w-5 h-5 border-t-2 border-l-2 border-champagne-400/80"></div>
-                        <div class="text-center">
-                            <p id="overlay-frame-title" class="font-serif italic text-champagne-200 text-xs tracking-widest drop-shadow">❤️ Анвар & Угилжон</p>
-                        </div>
-                        <div class="w-5 h-5 border-t-2 border-r-2 border-champagne-400/80"></div>
-                    </div>
-
-                    <!-- Crosshair Target -->
-                    <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-25">
-                        <div class="w-10 h-10 border border-white/60 rounded-full flex items-center justify-center">
-                            <div class="w-1.5 h-1.5 bg-champagne-400 rounded-full"></div>
-                        </div>
-                    </div>
-
-                    <div class="flex justify-between items-end">
-                        <div class="w-5 h-5 border-b-2 border-l-2 border-champagne-400/80"></div>
-                        <p id="overlay-frame-subtitle" class="text-[9px] uppercase font-mono tracking-widest text-stone-300 drop-shadow">WEDDING MEMORY • <span id="current-frame-style-name">КЛАССИК</span></p>
-                        <div class="w-5 h-5 border-b-2 border-r-2 border-champagne-400/80"></div>
-                    </div>
-                </div>
-
-                <!-- Initializing / Permission Prompt Screen -->
-                <div id="camera-placeholder" class="absolute inset-0 bg-stone-950 flex flex-col items-center justify-center p-6 text-center z-20">
-                    <div class="w-16 h-16 rounded-full bg-champagne-500/10 border border-champagne-500/30 flex items-center justify-center text-champagne-400 text-2xl mb-4 animate-pulse">
+                    <div class="px-6 py-2.5 rounded-full bg-gradient-to-r from-champagne-500 to-champagne-600 text-stone-950 font-bold text-xs uppercase tracking-wider shadow-lg flex items-center space-x-2">
                         <i class="fa-solid fa-camera"></i>
+                        <span>Сделать Снимок</span>
                     </div>
-                    <h3 class="font-serif text-xl text-champagne-200 mb-2">Подключение Камеры</h3>
-                    <p class="text-xs text-stone-400 max-w-xs mb-6">Подтвердите доступ к камере в запросе браузера, чтобы делать снимки.</p>
-                    
-                    <div class="flex flex-col w-full max-w-xs space-y-2.5">
-                        <button onclick="initCamera()" class="w-full py-3 rounded-full bg-gradient-to-r from-champagne-500 to-champagne-600 text-stone-950 font-bold text-xs uppercase tracking-wider shadow-lg active:scale-95 transition">
-                            Включить Камеру
-                        </button>
-                        <button onclick="switchToNativeFallbackEngine('Используется стандартное приложение камеры.')" class="w-full py-2.5 rounded-full bg-stone-800 border border-stone-700 text-stone-300 text-xs hover:bg-stone-700 transition">
-                            Открыть камеру телефона
-                        </button>
-                    </div>
+                </div>
+
+                <!-- Frame Style Badge -->
+                <div class="absolute bottom-4 left-0 right-0 text-center pointer-events-none">
+                    <p id="overlay-frame-subtitle" class="text-[10px] uppercase font-mono tracking-widest text-champagne-300/80 drop-shadow">
+                        WEDDING MEMORY • РАМКА: <span id="current-frame-style-name" class="font-bold text-champagne-400">КЛАССИК</span>
+                    </p>
                 </div>
             </div>
 
@@ -253,8 +193,8 @@
                 <!-- Status Badge -->
                 <div class="w-full flex items-center justify-between text-[10px]">
                     <span id="engine-status-badge" class="text-stone-400 flex items-center space-x-1">
-                        <span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
-                        <span id="engine-status-text">Прямой эфир</span>
+                        <span class="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>
+                        <span id="engine-status-text">Камера телефона</span>
                     </span>
                     <button onclick="switchTab('album')" class="text-champagne-400 hover:underline flex items-center font-medium">
                         Смотреть все фото <i class="fa-solid fa-chevron-right text-[8px] ml-1"></i>
@@ -285,7 +225,7 @@
                         </div>
                     </button>
 
-                    <!-- Hidden Native Android Input -->
+                    <!-- Hidden Native Camera Input -->
                     <input type="file" id="native-camera-input" accept="image/*" capture="environment" class="hidden" onchange="handleNativeCameraCapture(event)">
 
                     <!-- Share QR Button -->
@@ -306,7 +246,7 @@
                     <h2 class="font-serif text-xl text-champagne-200 font-bold">Свадебный Архив</h2>
                     <p class="text-xs text-stone-400">Все фотографии гостей свадьбы</p>
                 </div>
-                <button onclick="loadPublicPhotos()" class="px-3 py-1.5 rounded-full bg-stone-800 border border-stone-700 text-xs text-champagne-300 hover:bg-stone-700">
+                <button onclick="renderSharedAlbumFromLocal()" class="px-3 py-1.5 rounded-full bg-stone-800 border border-stone-700 text-xs text-champagne-300 hover:bg-stone-700">
                     <i class="fa-solid fa-rotate-right mr-1"></i> Обновить
                 </button>
             </div>
@@ -395,70 +335,45 @@
         </main>
     </div>
 
-    <!-- MODAL 1: ANDROID PERMISSION GUIDE -->
+    <!-- MODAL 1: PERMISSION GUIDE -->
     <div id="modal-permission-guide" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-300">
         <div class="w-full max-w-sm glass-panel p-5 rounded-3xl border border-champagne-500/30 text-left max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-3 border-b border-stone-800 pb-2">
-                <h3 class="font-serif text-lg text-champagne-200 font-bold"><i class="fa-brands fa-android text-emerald-400 mr-2"></i>Доступ к камере</h3>
+                <h3 class="font-serif text-lg text-champagne-200 font-bold"><i class="fa-solid fa-circle-info text-champagne-400 mr-2"></i>Как делать снимки</h3>
                 <button onclick="closeModal('modal-permission-guide')" class="text-stone-400 hover:text-white">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
 
-            <p class="text-xs text-stone-300 mb-4 leading-relaxed">Если браузер не открывает камеру:</p>
+            <p class="text-xs text-stone-300 mb-4 leading-relaxed">
+                Съемка выполняется через стандартное приложение камеры вашего телефона.
+            </p>
 
             <div class="space-y-3 text-xs mb-5">
                 <div class="p-3 bg-stone-900/90 rounded-xl border border-stone-800 flex items-start space-x-3">
                     <span class="w-5 h-5 rounded-full bg-champagne-500/20 text-champagne-400 font-bold flex items-center justify-center text-[10px] flex-shrink-0">1</span>
                     <div>
-                        <strong class="text-champagne-200 block mb-0.5">Значок замочка в строке URL</strong>
-                        <p class="text-stone-400 text-[11px]">Нажмите на иконку замочка слева от адреса сайта и разрешите пункт «Камера».</p>
+                        <strong class="text-champagne-200 block mb-0.5">Нажмите «Сделать Снимок»</strong>
+                        <p class="text-stone-400 text-[11px]">Откроется системная камера вашего смартфона.</p>
                     </div>
                 </div>
 
                 <div class="p-3 bg-stone-900/90 rounded-xl border border-stone-800 flex items-start space-x-3">
                     <span class="w-5 h-5 rounded-full bg-champagne-500/20 text-champagne-400 font-bold flex items-center justify-center text-[10px] flex-shrink-0">2</span>
                     <div>
-                        <strong class="text-champagne-200 block mb-0.5">Настройки Android</strong>
-                        <p class="text-stone-400 text-[11px]">Настройки ➔ Приложения ➔ Chrome ➔ Разрешения ➔ Камера ➔ Разрешить.</p>
+                        <strong class="text-champagne-200 block mb-0.5">Сделайте фото и подтвердите</strong>
+                        <p class="text-stone-400 text-[11px]">Снимок автоматически украсится рамкой и сохранится в свадебном архиве.</p>
                     </div>
                 </div>
             </div>
 
-            <div class="space-y-2">
-                <button onclick="initCamera(); closeModal('modal-permission-guide');" class="w-full py-2.5 rounded-full bg-champagne-500 text-stone-950 font-bold text-xs uppercase tracking-wider">
-                    Включить камеру
-                </button>
-                <button onclick="switchToNativeFallbackEngine('Используется стандартное приложение камеры.'); closeModal('modal-permission-guide');" class="w-full py-2.5 rounded-full bg-stone-800 text-stone-300 font-semibold text-xs border border-stone-700">
-                    Режим встроенной камеры
-                </button>
-            </div>
+            <button onclick="closeModal('modal-permission-guide'); triggerShutter();" class="w-full py-2.5 rounded-full bg-champagne-500 text-stone-950 font-bold text-xs uppercase tracking-wider">
+                Открыть камеру
+            </button>
         </div>
     </div>
 
-    <!-- MODAL 2: IN-APP BROWSER MODAL -->
-    <div id="modal-inapp" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-300">
-        <div class="w-full max-w-sm glass-gold p-5 rounded-3xl border border-amber-500/40 text-center">
-            <div class="w-12 h-12 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300 text-xl mx-auto mb-3">
-                <i class="fa-solid fa-arrow-up-right-from-square"></i>
-            </div>
-            <h3 class="font-serif text-lg text-amber-200 font-bold mb-1">Откройте в Chrome / Safari</h3>
-            <p class="text-xs text-stone-300 mb-4 leading-relaxed">
-                Встроенные браузеры мессенджеров (Telegram, WhatsApp, VK) блокируют видеокамеру.
-            </p>
-            <div class="space-y-2">
-                <button onclick="copyCurrentUrl()" class="w-full py-2.5 rounded-full bg-amber-500 text-stone-950 font-bold text-xs uppercase tracking-wider">
-                    <i class="fa-regular fa-copy mr-1"></i> Скопировать ссылку
-                </button>
-                <p class="text-[10px] text-stone-400">Затем вставьте её в браузер Chrome на телефоне</p>
-                <button onclick="closeModal('modal-inapp')" class="mt-2 text-xs text-stone-400 hover:text-white underline">
-                    Продолжить здесь
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL 3: 15 SHOTS COMPLETED -->
+    <!-- MODAL 2: 15 SHOTS COMPLETED -->
     <div id="modal-finished" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-300">
         <div class="w-full max-w-sm glass-gold p-6 rounded-3xl border border-champagne-500/40 text-center">
             <div class="w-14 h-14 rounded-full bg-champagne-500/20 border border-champagne-500/50 flex items-center justify-center text-champagne-300 text-2xl mx-auto mb-3">
@@ -474,7 +389,7 @@
         </div>
     </div>
 
-    <!-- MODAL 4: LIGHTBOX PHOTO VIEW -->
+    <!-- MODAL 3: LIGHTBOX PHOTO VIEW -->
     <div id="modal-lightbox" class="fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-between p-4 opacity-0 pointer-events-none transition-all duration-300">
         <div class="w-full flex justify-between items-center z-10 pt-2">
             <span id="lightbox-author" class="text-xs text-champagne-300 font-serif">Фото от Гостя</span>
@@ -495,7 +410,7 @@
         </div>
     </div>
 
-    <!-- MODAL 5: HIGH-CONTRAST QR CODE & PRINT CARD -->
+    <!-- MODAL 4: HIGH-CONTRAST QR CODE & PRINT CARD -->
     <div id="modal-qr" class="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-300">
         <div class="w-full max-w-sm glass-panel p-5 rounded-3xl border border-champagne-500/40 text-center max-h-[92vh] overflow-y-auto">
             
@@ -526,7 +441,7 @@
         </div>
     </div>
 
-    <!-- MODAL 6: GUEST NAME SETTER -->
+    <!-- MODAL 5: GUEST NAME SETTER -->
     <div id="modal-name" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-300">
         <div class="w-full max-w-xs glass-panel p-5 rounded-3xl border border-champagne-500/30 text-center">
             <h3 class="font-serif text-lg text-champagne-200 font-bold mb-1">Представьтесь ✨</h3>
@@ -547,7 +462,6 @@
     <script>
         // App State Variables
         const MAX_SHOTS = 15;
-        let activeEngine = 'live';
         let guestId = localStorage.getItem('wedding_guest_id') || ('guest_' + Math.random().toString(36).substring(2, 9));
         localStorage.setItem('wedding_guest_id', guestId);
 
@@ -555,8 +469,6 @@
         let shotsTaken = parseInt(localStorage.getItem(`wedding_shots_${guestId}`) || '0', 10);
         let guestPhotos = JSON.parse(localStorage.getItem(`wedding_local_photos_${guestId}`) || '[]');
 
-        let stream = null;
-        let facingMode = "environment";
         let frameStyleIndex = 0;
         const frameStyles = [
             { name: "КЛАССИК", border: true, textColor: "#F4EAD3" },
@@ -576,103 +488,7 @@
             applyWeddingSettingsUI();
             renderMiniGallery();
             renderSharedAlbumFromLocal();
-            runDiagnostics();
-            initCamera();
         });
-
-        function runDiagnostics() {
-            const isSecure = window.isSecureContext || location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-            const ua = navigator.userAgent || navigator.vendor || window.opera;
-            const isInApp = /Telegram|FBAN|FBAV|Instagram|WhatsApp|Viber|VK|Line|Snapchat/i.test(ua);
-
-            if (!isSecure) {
-                document.getElementById('http-warning-banner').classList.remove('hidden');
-            }
-            if (isInApp) {
-                document.getElementById('inapp-browser-banner').classList.remove('hidden');
-            }
-        }
-
-        // Camera Engine 1: Live Stream
-        window.initCamera = async function() {
-            const isSecure = window.isSecureContext || location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-            
-            if (!isSecure || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                switchToNativeFallbackEngine("Требуется HTTPS. Включена стандартная камера.");
-                return;
-            }
-
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-            }
-
-            const constraintOptions = [
-                { video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 }, zoom: 1 } },
-                { video: { facingMode: facingMode } },
-                { video: true }
-            ];
-
-            let success = false;
-            for (const constraints of constraintOptions) {
-                try {
-                    stream = await navigator.mediaDevices.getUserMedia(constraints);
-                    const videoEl = document.getElementById('camera-video');
-                    videoEl.srcObject = stream;
-                    await videoEl.play();
-                    const track = stream.getVideoTracks()[0];
-if (track && track.getCapabilities && track.getCapabilities().zoom) {
-    track.applyConstraints({ advanced: [{ zoom: track.getCapabilities().zoom.min || 1 }] }).catch(() => {});
-}
-                    document.getElementById('camera-placeholder').classList.add('hidden');
-                    document.getElementById('fallback-camera-container').classList.add('hidden');
-                    document.getElementById('live-camera-container').classList.remove('hidden');
-                    activeEngine = 'live';
-                    updateEngineBadge("Прямой эфир", "bg-emerald-400");
-                    success = true;
-                    break;
-                } catch (e) {
-                    console.warn("Camera constraint error:", e);
-                }
-            }
-
-            if (!success) {
-                switchToNativeFallbackEngine("Доступ к трансляции ограничен. Включена встроенная камера.");
-            }
-        };
-
-        // Camera Engine 2: Native Android Capture Fallback
-        window.switchToNativeFallbackEngine = function(reason) {
-            activeEngine = 'native';
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-            }
-            document.getElementById('camera-placeholder').classList.add('hidden');
-            document.getElementById('live-camera-container').classList.add('hidden');
-            document.getElementById('fallback-camera-container').classList.remove('hidden');
-            
-            if (reason) {
-                document.getElementById('fallback-reason-text').innerText = reason;
-            }
-            updateEngineBadge("Камера телефона", "bg-amber-400");
-        };
-
-        function updateEngineBadge(text, colorClass) {
-            const badgeText = document.getElementById('engine-status-text');
-            const badgeDot = document.getElementById('engine-status-badge').firstElementChild;
-            if (badgeText && badgeDot) {
-                badgeText.innerText = text;
-                badgeDot.className = `w-2 h-2 rounded-full ${colorClass} inline-block`;
-            }
-        }
-
-        window.switchCameraFacing = function() {
-            facingMode = facingMode === "environment" ? "user" : "environment";
-            if (activeEngine === 'live') {
-                initCamera();
-            } else {
-                showToast("Выбор камеры осуществляется в приложении камеры.");
-            }
-        };
 
         window.cycleFrameStyle = function() {
             frameStyleIndex = (frameStyleIndex + 1) % frameStyles.length;
@@ -686,53 +502,8 @@ if (track && track.getCapabilities && track.getCapabilities().zoom) {
                 openModal('modal-finished');
                 return;
             }
-
-            if (activeEngine === 'live') {
-                takeLivePhoto();
-            } else {
-                document.getElementById('native-camera-input').click();
-            }
+            document.getElementById('native-camera-input').click();
         };
-
-        function takeLivePhoto() {
-            playShutterSound();
-            triggerFlash();
-
-            const video = document.getElementById('camera-video');
-            const canvas = document.getElementById('hidden-canvas');
-            const ctx = canvas.getContext('2d');
-
-            const width = video.videoWidth || 1080;
-            const height = video.videoHeight || 1440;
-            canvas.width = width;
-            canvas.height = height;
-
-            if (facingMode === "user") {
-                ctx.translate(width, 0);
-                ctx.scale(-1, 1);
-            }
-            const vWidth = video.videoWidth;
-const vHeight = video.videoHeight;
-const cWidth = canvas.width;
-const cHeight = canvas.height;
-const videoAspect = vWidth / vHeight;
-const canvasAspect = cWidth / cHeight;
-let sx = 0, sy = 0, sWidth = vWidth, sHeight = vHeight;
-if (videoAspect > canvasAspect) {
-    sWidth = vHeight * canvasAspect;
-    sx = (vWidth - sWidth) / 2;
-} else {
-    sHeight = vWidth / canvasAspect;
-    sy = (vHeight - sHeight) / 2;
-}
-ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, cWidth, cHeight);
-            ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-            applyCanvasWeddingOverlay(ctx, width, height);
-
-            const photoDataUrl = canvas.toDataURL('image/jpeg', 0.78);
-            savePhotoEntry(photoDataUrl);
-        }
 
         window.handleNativeCameraCapture = function(event) {
             const file = event.target.files && event.target.files[0];
@@ -748,7 +519,7 @@ ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, cWidth, cHeight);
                 const canvas = document.getElementById('hidden-canvas');
                 const ctx = canvas.getContext('2d');
                 
-                // Max scale to 1200px
+                // Scale photo size for speed and local storage limits (Max 1200px)
                 let w = img.width;
                 let h = img.height;
                 const maxDim = 1200;
@@ -768,7 +539,7 @@ ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, cWidth, cHeight);
                 ctx.drawImage(img, 0, 0, w, h);
                 applyCanvasWeddingOverlay(ctx, w, h);
 
-                const photoDataUrl = canvas.toDataURL('image/jpeg', 0.78);
+                const photoDataUrl = canvas.toDataURL('image/jpeg', 0.80);
                 URL.revokeObjectURL(url);
 
                 savePhotoEntry(photoDataUrl);
@@ -986,7 +757,6 @@ ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, cWidth, cHeight);
         function applyWeddingSettingsUI() {
             document.getElementById('wedding-title').innerText = weddingSettings.names;
             document.getElementById('wedding-date').innerText = weddingSettings.date;
-            document.getElementById('overlay-frame-title').innerText = `❤️ ${weddingSettings.names}`;
             document.getElementById('cfg-wedding-names').value = weddingSettings.names;
             document.getElementById('cfg-wedding-date').value = weddingSettings.date;
             document.getElementById('cfg-site-url').value = weddingSettings.siteUrl;
@@ -1006,7 +776,6 @@ ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, cWidth, cHeight);
         window.closeModal = id => document.getElementById(id).classList.add('opacity-0', 'pointer-events-none');
 
         window.openPermissionGuideModal = () => openModal('modal-permission-guide');
-        window.openInAppModal = () => openModal('modal-inapp');
         
         window.openQrModal = function() {
             renderHighContrastQR();
@@ -1037,7 +806,6 @@ ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, cWidth, cHeight);
             showToast("Ссылка скопирована!");
         };
 
-        // Render Standard High-Contrast QR Code to Canvas
         function renderHighContrastQR() {
             const canvas = document.getElementById('qr-canvas');
             if (!canvas) return;
@@ -1054,7 +822,6 @@ ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, cWidth, cHeight);
                 ctx.drawImage(img, 0, 0, 300, 300);
             };
             img.onerror = () => {
-                // High contrast fallback text
                 canvas.width = 300;
                 canvas.height = 300;
                 ctx.fillStyle = '#ffffff';

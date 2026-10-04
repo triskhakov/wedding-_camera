@@ -155,15 +155,11 @@
                     <button onclick="openPermissionGuideModal()" class="w-9 h-9 rounded-full glass-panel flex items-center justify-center text-amber-300 border border-amber-500/40 active:scale-95 transition" title="Инструкция">
                         <i class="fa-solid fa-circle-question text-xs"></i>
                     </button>
-                    <button id="btn-toggle-frame" onclick="cycleFrameStyle()" class="w-9 h-9 rounded-full glass-panel flex items-center justify-center text-champagne-300 border border-champagne-500/30 active:scale-95 transition" title="Сменить рамку">
-                        <i class="fa-solid fa-wand-magic-sparkles text-xs"></i>
-                    </button>
                 </div>
             </div>
 
             <!-- Central Native Camera Interface -->
             <div class="relative w-full h-full flex items-center justify-center overflow-hidden bg-stone-950 p-6">
-                
                 <div onclick="triggerShutter()" class="w-full max-w-xs glass-gold rounded-3xl p-6 text-center border border-champagne-500/40 shadow-2xl cursor-pointer active:scale-95 transition flex flex-col items-center">
                     <div class="w-20 h-20 rounded-full bg-champagne-500/15 border border-champagne-500/40 flex items-center justify-center text-champagne-400 text-3xl mb-4 shadow-inner">
                         <i class="fa-solid fa-camera-retro"></i>
@@ -176,13 +172,6 @@
                         <i class="fa-solid fa-camera"></i>
                         <span>Сделать Снимок</span>
                     </div>
-                </div>
-
-                <!-- Frame Style Badge -->
-                <div class="absolute bottom-4 left-0 right-0 text-center pointer-events-none">
-                    <p id="overlay-frame-subtitle" class="text-[10px] uppercase font-mono tracking-widest text-champagne-300/80 drop-shadow">
-                        WEDDING MEMORY • РАМКА: <span id="current-frame-style-name" class="font-bold text-champagne-400">КЛАССИК</span>
-                    </p>
                 </div>
             </div>
 
@@ -362,7 +351,7 @@
                     <span class="w-5 h-5 rounded-full bg-champagne-500/20 text-champagne-400 font-bold flex items-center justify-center text-[10px] flex-shrink-0">2</span>
                     <div>
                         <strong class="text-champagne-200 block mb-0.5">Сделайте фото и подтвердите</strong>
-                        <p class="text-stone-400 text-[11px]">Снимок автоматически украсится рамкой и сохранится в свадебном архиве.</p>
+                        <p class="text-stone-400 text-[11px]">Снимок автоматически сохранится с памятной подписью в общем свадебном архиве.</p>
                     </div>
                 </div>
             </div>
@@ -474,13 +463,6 @@
         let shotsTaken = parseInt(localStorage.getItem(`wedding_shots_${guestId}`) || '0', 10);
         let guestPhotos = JSON.parse(localStorage.getItem(`wedding_local_photos_${guestId}`) || '[]');
 
-        let frameStyleIndex = 0;
-        const frameStyles = [
-            { name: "КЛАССИК", border: true, textColor: "#F4EAD3" },
-            { name: "ЗОЛОТОЙ", border: true, textColor: "#D4AF37" },
-            { name: "ЧИСТЫЙ", border: false, textColor: "#FFFFFF" }
-        ];
-
         let weddingSettings = {
             names: localStorage.getItem('wedding_cfg_names') || "Анвар & Угилжон",
             date: localStorage.getItem('wedding_cfg_date') || "09.11.2026",
@@ -516,12 +498,6 @@
             }
         };
 
-        window.cycleFrameStyle = function() {
-            frameStyleIndex = (frameStyleIndex + 1) % frameStyles.length;
-            document.getElementById('current-frame-style-name').innerText = frameStyles[frameStyleIndex].name;
-            showToast(`Рамка: ${frameStyles[frameStyleIndex].name}`);
-        };
-
         // Main Shutter Trigger
         window.triggerShutter = function() {
             if (shotsTaken >= MAX_SHOTS) {
@@ -545,7 +521,7 @@
                 const canvas = document.getElementById('hidden-canvas');
                 const ctx = canvas.getContext('2d');
                 
-                // Берем 100% оригинальные размеры фото камеры без каких-либо ограничений (3072х4096 / 12MP / 48MP)
+                // Берем 100% оригинальные размеры фото камеры без каких-либо ограничений
                 const w = img.width;
                 const h = img.height;
 
@@ -567,20 +543,7 @@
         };
 
         function applyCanvasWeddingOverlay(ctx, w, h) {
-            const currentStyle = frameStyles[frameStyleIndex];
-
-            // Warm Filter Overlay
-            ctx.fillStyle = "rgba(244, 234, 211, 0.02)";
-            ctx.fillRect(0, 0, w, h);
-
-            // Frame Border
-            if (currentStyle.border) {
-                ctx.strokeStyle = "rgba(212, 175, 55, 0.6)";
-                ctx.lineWidth = Math.max(8, w * 0.015);
-                ctx.strokeRect(ctx.lineWidth / 2, ctx.lineWidth / 2, w - ctx.lineWidth, h - ctx.lineWidth);
-            }
-
-            // Watermark Ribbon
+            // Watermark Ribbon (Градиентная плашка под текст подписи)
             const ribbonHeight = Math.max(60, h * 0.08);
             const gradient = ctx.createLinearGradient(0, h - ribbonHeight, 0, h);
             gradient.addColorStop(0, "rgba(0,0,0,0)");
@@ -589,8 +552,8 @@
             ctx.fillStyle = gradient;
             ctx.fillRect(0, h - ribbonHeight, w, ribbonHeight);
 
-            // Text
-            ctx.fillStyle = currentStyle.textColor;
+            // Текст подписи
+            ctx.fillStyle = "#F4EAD3";
             ctx.textAlign = "center";
             
             const titleFontSize = Math.max(16, Math.round(w * 0.035));

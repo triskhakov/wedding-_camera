@@ -259,18 +259,35 @@
 
         <!-- VIEW 3: ADMIN / ORGANIZERS PANEL -->
         <main id="view-admin" class="hidden flex-1 flex-col overflow-y-auto bg-stone-950 p-4">
-            <!-- Password Check -->
+            
+            <!-- Password Authorization Container -->
             <div id="admin-auth-container" class="my-auto flex flex-col items-center text-center p-6 glass-panel rounded-2xl border border-champagne-500/30">
                 <div class="w-12 h-12 rounded-full bg-champagne-500/10 border border-champagne-500/30 flex items-center justify-center text-champagne-400 text-xl mb-3">
                     <i class="fa-solid fa-lock"></i>
                 </div>
                 <h3 class="font-serif text-xl text-champagne-200 font-bold mb-1">Панель Организаторов</h3>
                 <p class="text-xs text-stone-400 mb-4">Введите ПИН-код для скачивания архива всех фото</p>
-                <input id="admin-pin-input" type="password" maxlength="6" placeholder="...." class="w-full text-center px-4 py-2.5 rounded-xl bg-stone-900 border border-stone-700 text-champagne-200 font-mono tracking-widest mb-3 focus:outline-none focus:border-champagne-500">
+                <input id="admin-pin-input" type="password" maxlength="6" placeholder="••••" class="w-full text-center px-4 py-2.5 rounded-xl bg-stone-900 border border-stone-700 text-champagne-200 font-mono tracking-widest mb-3 focus:outline-none focus:border-champagne-500">
                 <button onclick="authenticateAdmin()" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-champagne-500 to-champagne-600 text-stone-950 font-bold text-xs uppercase tracking-wider shadow-lg">
                     Войти в панель
                 </button>
             </div>
+
+            <!-- Dashboard Content (Revealed after successful auth) -->
+            <div id="admin-dashboard-content" class="hidden flex-col space-y-4 pb-20">
+                <div class="p-4 rounded-2xl glass-gold">
+                    <h3 class="font-serif text-lg font-bold text-champagne-200 mb-1">Статистика Свадьбы</h3>
+                    <div class="grid grid-cols-2 gap-3 mt-3">
+                        <div class="bg-stone-900/80 p-3 rounded-xl border border-stone-800">
+                            <span class="text-[10px] text-stone-400 uppercase">Всего фото</span>
+                            <p class="text-2xl font-bold font-mono text-champagne-400" id="stat-total-photos">0</p>
+                        </div>
+                        <div class="bg-stone-900/80 p-3 rounded-xl border border-stone-800">
+                            <span class="text-[10px] text-stone-400 uppercase">Гостей со снимками</span>
+                            <p class="text-2xl font-bold font-mono text-champagne-400" id="stat-total-guests">0</p>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Export Options -->
                 <div class="p-4 rounded-2xl glass-panel border border-stone-800 space-y-3">
@@ -401,7 +418,6 @@
                 <p class="font-serif text-lg font-bold text-amber-900 leading-tight">❤️ <span id="card-names">Анвар & Угилжон</span></p>
                 <p class="text-[10px] text-stone-500 font-mono tracking-widest uppercase mb-3" id="card-date">09.11.2026</p>
                 
-                <!-- Standard High-Contrast Black/White QR Image -->
                 <div class="bg-white p-2 border-2 border-stone-900 rounded-xl inline-block shadow-inner mb-2">
                     <canvas id="qr-canvas" class="w-52 h-52 mx-auto block"></canvas>
                 </div>
@@ -424,7 +440,7 @@
         </div>
     </div>
 
-    <!-- MODAL 5: GUEST NAME SETTER -->
+    <!-- MODAL 5: GUEST NAME SETTER (Приветственное окно) -->
     <div id="modal-name" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-300">
         <div class="w-full max-w-xs glass-panel p-5 rounded-3xl border border-champagne-500/30 text-center">
             <h3 class="font-serif text-lg text-champagne-200 font-bold mb-1">Представьтесь ✨</h3>
@@ -445,8 +461,8 @@
     <script>
         // Конфигурация Автоматического Сохранения в Облако Telegram
         const CLOUD_CONFIG = {
-            telegramBotToken: "8835401978:AAHwSnxzW140WDkotcZkEW4umHsFB7viPZ0", // Вставьте токен вашего Telegram-бота (например: "123456789:ABCdefGhIJKlmNo")
-            telegramChatId: "-1004225514927"     // Вставьте ID чата или юзернейм канала (например: "@wedding_channel" или "-100123456789")
+            telegramBotToken: "8835401978:AAHwSnxzW140WDkotcZkEW4umHsFB7viPZ0", // Вставьте токен вашего бота (пример: "123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ")
+            telegramChatId: "-1004225514927"     // Вставьте ID чата или имя канала (пример: "@wedding_anvar_ugiljon" или "-1002485930192")
         };
 
         // App State Variables
@@ -454,7 +470,7 @@
         let guestId = localStorage.getItem('wedding_guest_id') || ('guest_' + Math.random().toString(36).substring(2, 9));
         localStorage.setItem('wedding_guest_id', guestId);
 
-        let guestName = localStorage.getItem('wedding_guest_name') || 'Гость';
+        let guestName = localStorage.getItem('wedding_guest_name') || '';
         let shotsTaken = parseInt(localStorage.getItem(`wedding_shots_${guestId}`) || '0', 10);
         let guestPhotos = JSON.parse(localStorage.getItem(`wedding_local_photos_${guestId}`) || '[]');
 
@@ -471,20 +487,35 @@
             siteUrl: localStorage.getItem('wedding_cfg_url') || window.location.href
         };
 
-       window.addEventListener('DOMContentLoaded', () => {
-    updateShotsCounterUI();
-    updateGuestNameUI();
-    applyWeddingSettingsUI();
-    renderMiniGallery();
-    renderSharedAlbumFromLocal();
+        window.addEventListener('DOMContentLoaded', () => {
+            updateShotsCounterUI();
+            updateGuestNameUI();
+            applyWeddingSettingsUI();
+            renderMiniGallery();
+            renderSharedAlbumFromLocal();
 
-    // Открываем окно ввода имени, если гость еще не сохранял свое имя
-    if (!localStorage.getItem('wedding_guest_name')) {
-        setTimeout(() => {
-            openModal('modal-name');
-        }, 300); // Небольшая задержка 0.3 сек для плавной анимации
-    }
-});
+            // Всплывает окно ввода имени при первом открытии сайта
+            if (!localStorage.getItem('wedding_guest_name')) {
+                setTimeout(() => {
+                    openModal('modal-name');
+                }, 300);
+            }
+        });
+
+        // ПИН-КОД АВТОРИЗАЦИИ ОРГАНИЗАТОРОВ
+        window.authenticateAdmin = function() {
+            const pin = document.getElementById('admin-pin-input').value.trim();
+            const validPins = ["2026", "7788", "1234"];
+
+            if (validPins.includes(pin)) {
+                document.getElementById('admin-auth-container').classList.add('hidden');
+                document.getElementById('admin-dashboard-content').classList.remove('hidden');
+                document.getElementById('admin-dashboard-content').classList.add('flex');
+                showToast("Доступ разрешен!");
+            } else {
+                showToast("Неверный ПИН-код!");
+            }
+        };
 
         window.cycleFrameStyle = function() {
             frameStyleIndex = (frameStyleIndex + 1) % frameStyles.length;
@@ -515,7 +546,6 @@
                 const canvas = document.getElementById('hidden-canvas');
                 const ctx = canvas.getContext('2d');
                 
-                // Scale photo size for performance & local storage limit (Max 1200px)
                 let w = img.width;
                 let h = img.height;
                 const maxDim = 1200;
@@ -547,18 +577,18 @@
         function applyCanvasWeddingOverlay(ctx, w, h) {
             const currentStyle = frameStyles[frameStyleIndex];
 
-            // 1. Warm Filter Overlay
+            // Warm Filter Overlay
             ctx.fillStyle = "rgba(244, 234, 211, 0.03)";
             ctx.fillRect(0, 0, w, h);
 
-            // 2. Frame Border
+            // Frame Border
             if (currentStyle.border) {
                 ctx.strokeStyle = "rgba(212, 175, 55, 0.6)";
                 ctx.lineWidth = Math.max(8, w * 0.015);
                 ctx.strokeRect(ctx.lineWidth / 2, ctx.lineWidth / 2, w - ctx.lineWidth, h - ctx.lineWidth);
             }
 
-            // 3. Watermark Ribbon
+            // Watermark Ribbon
             const ribbonHeight = Math.max(60, h * 0.08);
             const gradient = ctx.createLinearGradient(0, h - ribbonHeight, 0, h);
             gradient.addColorStop(0, "rgba(0,0,0,0)");
@@ -567,7 +597,7 @@
             ctx.fillStyle = gradient;
             ctx.fillRect(0, h - ribbonHeight, w, ribbonHeight);
 
-            // 4. Text
+            // Text
             ctx.fillStyle = currentStyle.textColor;
             ctx.textAlign = "center";
             
@@ -578,19 +608,21 @@
             const subFontSize = Math.max(10, Math.round(w * 0.020));
             ctx.font = `${subFontSize}px "Montserrat", sans-serif`;
             ctx.fillStyle = "rgba(244, 234, 211, 0.85)";
-            ctx.fillText(`${weddingSettings.date} • Фото: ${guestName}`, w / 2, h - (ribbonHeight * 0.20));
+            const displayAuthor = guestName || 'Гость';
+            ctx.fillText(`${weddingSettings.date} • Фото: ${displayAuthor}`, w / 2, h - (ribbonHeight * 0.20));
         }
 
         function savePhotoEntry(photoDataUrl) {
             shotsTaken++;
             localStorage.setItem(`wedding_shots_${guestId}`, shotsTaken.toString());
             
+            const currentAuthor = guestName || 'Гость';
             const newPhotoObj = {
                 id: Date.now().toString(),
                 photoData: photoDataUrl,
                 timestamp: Date.now(),
                 guestId: guestId,
-                guestName: guestName,
+                guestName: currentAuthor,
                 photoNumber: shotsTaken
             };
 
@@ -605,8 +637,8 @@
             renderMiniGallery();
             renderSharedAlbumFromLocal();
 
-            // Автоматическая загрузка в облако
-            uploadToCloud(photoDataUrl, guestName);
+            // Автоматическая загрузка в Telegram-облако
+            uploadToCloud(photoDataUrl, currentAuthor);
 
             if (shotsTaken >= MAX_SHOTS) {
                 setTimeout(() => openModal('modal-finished'), 400);
@@ -677,7 +709,7 @@
             }
 
             gallery.innerHTML = guestPhotos.map(p => `
-                <div onclick="openLightbox('${p.photoData}', '${guestName}')" class="flex-shrink-0 w-10 h-10 rounded-lg overflow-hidden border border-champagne-500/40 cursor-pointer active:scale-95 transition">
+                <div onclick="openLightbox('${p.photoData}', '${guestName || 'Гость'}')" class="flex-shrink-0 w-10 h-10 rounded-lg overflow-hidden border border-champagne-500/40 cursor-pointer active:scale-95 transition">
                     <img src="${p.photoData}" class="w-full h-full object-cover">
                 </div>
             `).join('');
@@ -777,7 +809,8 @@
         }
 
         function updateGuestNameUI() {
-            document.getElementById('lbl-guest-name').innerText = guestName;
+            const nameToDisplay = guestName || 'Гость';
+            document.getElementById('lbl-guest-name').innerText = nameToDisplay;
             document.getElementById('input-guest-name').value = guestName;
         }
 

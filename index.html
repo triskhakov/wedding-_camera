@@ -473,13 +473,20 @@
             siteUrl: localStorage.getItem('wedding_cfg_url') || window.location.href
         };
 
-        window.addEventListener('DOMContentLoaded', () => {
-            updateShotsCounterUI();
-            updateGuestNameUI();
-            applyWeddingSettingsUI();
-            renderMiniGallery();
-            renderSharedAlbumFromLocal();
-        });
+       window.addEventListener('DOMContentLoaded', () => {
+    updateShotsCounterUI();
+    updateGuestNameUI();
+    applyWeddingSettingsUI();
+    renderMiniGallery();
+    renderSharedAlbumFromLocal();
+
+    // Открываем окно ввода имени, если гость еще не сохранял свое имя
+    if (!localStorage.getItem('wedding_guest_name')) {
+        setTimeout(() => {
+            openModal('modal-name');
+        }, 300); // Небольшая задержка 0.3 сек для плавной анимации
+    }
+});
 
         window.cycleFrameStyle = function() {
             frameStyleIndex = (frameStyleIndex + 1) % frameStyles.length;

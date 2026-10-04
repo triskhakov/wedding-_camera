@@ -257,22 +257,20 @@
             </div>
         </main>
 
-        <!-- VIEW 3: ADMIN / ORGANIZERS PANEL (ПИН-код полностью убран) -->
+        <!-- VIEW 3: ADMIN / ORGANIZERS PANEL -->
         <main id="view-admin" class="hidden flex-1 flex-col overflow-y-auto bg-stone-950 p-4">
-            <div id="admin-dashboard-content" class="flex flex-col space-y-4 pb-20">
-                <div class="p-4 rounded-2xl glass-gold">
-                    <h3 class="font-serif text-lg font-bold text-champagne-200 mb-1">Статистика Свадьбы</h3>
-                    <div class="grid grid-cols-2 gap-3 mt-3">
-                        <div class="bg-stone-900/80 p-3 rounded-xl border border-stone-800">
-                            <span class="text-[10px] text-stone-400 uppercase">Всего фото</span>
-                            <p class="text-2xl font-bold font-mono text-champagne-400" id="stat-total-photos">0</p>
-                        </div>
-                        <div class="bg-stone-900/80 p-3 rounded-xl border border-stone-800">
-                            <span class="text-[10px] text-stone-400 uppercase">Гостей со снимками</span>
-                            <p class="text-2xl font-bold font-mono text-champagne-400" id="stat-total-guests">0</p>
-                        </div>
-                    </div>
+            <!-- Password Check -->
+            <div id="admin-auth-container" class="my-auto flex flex-col items-center text-center p-6 glass-panel rounded-2xl border border-champagne-500/30">
+                <div class="w-12 h-12 rounded-full bg-champagne-500/10 border border-champagne-500/30 flex items-center justify-center text-champagne-400 text-xl mb-3">
+                    <i class="fa-solid fa-lock"></i>
                 </div>
+                <h3 class="font-serif text-xl text-champagne-200 font-bold mb-1">Панель Организаторов</h3>
+                <p class="text-xs text-stone-400 mb-4">Введите ПИН-код для скачивания архива всех фото</p>
+                <input id="admin-pin-input" type="password" maxlength="6" placeholder="...." class="w-full text-center px-4 py-2.5 rounded-xl bg-stone-900 border border-stone-700 text-champagne-200 font-mono tracking-widest mb-3 focus:outline-none focus:border-champagne-500">
+                <button onclick="authenticateAdmin()" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-champagne-500 to-champagne-600 text-stone-950 font-bold text-xs uppercase tracking-wider shadow-lg">
+                    Войти в панель
+                </button>
+            </div>
 
                 <!-- Export Options -->
                 <div class="p-4 rounded-2xl glass-panel border border-stone-800 space-y-3">

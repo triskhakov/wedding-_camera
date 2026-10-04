@@ -161,17 +161,16 @@
                 </div>
             </div>
 
-            <!-- Viewfinder / Native Camera Target Area -->
+            <!-- Central Native Camera Interface -->
             <div class="relative w-full h-full flex items-center justify-center overflow-hidden bg-stone-950 p-6">
                 
-                <!-- Central Native Camera Card -->
-                <div onclick="triggerShutter()" class="w-full max-w-xs glass-gold rounded-3xl p-6 text-center border border-champagne-500/40 shadow-2xl cursor-pointer active:scale-98 transition flex flex-col items-center">
+                <div onclick="triggerShutter()" class="w-full max-w-xs glass-gold rounded-3xl p-6 text-center border border-champagne-500/40 shadow-2xl cursor-pointer active:scale-95 transition flex flex-col items-center">
                     <div class="w-20 h-20 rounded-full bg-champagne-500/15 border border-champagne-500/40 flex items-center justify-center text-champagne-400 text-3xl mb-4 shadow-inner">
                         <i class="fa-solid fa-camera-retro"></i>
                     </div>
                     <h3 class="font-serif text-2xl text-champagne-200 mb-2 font-bold">Свадебный Кадр</h3>
                     <p class="text-xs text-stone-300 leading-relaxed mb-6">
-                        Нажмите сюда или на золотую кнопку внизу, чтобы открыть камеру телефона и сделать фото.
+                        Нажмите сюда или на золотую кнопку внизу, чтобы открыть камеру вашего телефона и сделать фото.
                     </p>
                     <div class="px-6 py-2.5 rounded-full bg-gradient-to-r from-champagne-500 to-champagne-600 text-stone-950 font-bold text-xs uppercase tracking-wider shadow-lg flex items-center space-x-2">
                         <i class="fa-solid fa-camera"></i>
@@ -193,8 +192,8 @@
                 <!-- Status Badge -->
                 <div class="w-full flex items-center justify-between text-[10px]">
                     <span id="engine-status-badge" class="text-stone-400 flex items-center space-x-1">
-                        <span class="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>
-                        <span id="engine-status-text">Камера телефона</span>
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
+                        <span id="engine-status-text">Камера телефона (Android)</span>
                     </span>
                     <button onclick="switchTab('album')" class="text-champagne-400 hover:underline flex items-center font-medium">
                         Смотреть все фото <i class="fa-solid fa-chevron-right text-[8px] ml-1"></i>
@@ -258,23 +257,9 @@
             </div>
         </main>
 
-        <!-- VIEW 3: ADMIN / ORGANIZERS PANEL -->
+        <!-- VIEW 3: ADMIN / ORGANIZERS PANEL (ПИН-код полностью убран) -->
         <main id="view-admin" class="hidden flex-1 flex-col overflow-y-auto bg-stone-950 p-4">
-            <!-- Password Check -->
-            <div id="admin-auth-container" class="my-auto flex flex-col items-center text-center p-6 glass-panel rounded-2xl border border-champagne-500/30">
-                <div class="w-12 h-12 rounded-full bg-champagne-500/10 border border-champagne-500/30 flex items-center justify-center text-champagne-400 text-xl mb-3">
-                    <i class="fa-solid fa-lock"></i>
-                </div>
-                <h3 class="font-serif text-xl text-champagne-200 font-bold mb-1">Панель Организаторов</h3>
-                <p class="text-xs text-stone-400 mb-4">Введите ПИН-код для скачивания архива всех фото</p>
-                <input id="admin-pin-input" type="password" maxlength="6" placeholder="...." class="w-full text-center px-4 py-2.5 rounded-xl bg-stone-900 border border-stone-700 text-champagne-200 font-mono tracking-widest mb-3 focus:outline-none focus:border-champagne-500">
-                <button onclick="authenticateAdmin()" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-champagne-500 to-champagne-600 text-stone-950 font-bold text-xs uppercase tracking-wider shadow-lg">
-                    Войти в панель
-                </button>
-            </div>
-
-            <!-- Admin Dashboard Content -->
-            <div id="admin-dashboard-content" class="hidden flex-col space-y-4 pb-20">
+            <div id="admin-dashboard-content" class="flex flex-col space-y-4 pb-20">
                 <div class="p-4 rounded-2xl glass-gold">
                     <h3 class="font-serif text-lg font-bold text-champagne-200 mb-1">Статистика Свадьбы</h3>
                     <div class="grid grid-cols-2 gap-3 mt-3">
@@ -346,7 +331,7 @@
             </div>
 
             <p class="text-xs text-stone-300 mb-4 leading-relaxed">
-                Съемка выполняется через стандартное приложение камеры вашего телефона.
+                Съемка выполняется через приложение камеры вашего телефона.
             </p>
 
             <div class="space-y-3 text-xs mb-5">
@@ -354,7 +339,7 @@
                     <span class="w-5 h-5 rounded-full bg-champagne-500/20 text-champagne-400 font-bold flex items-center justify-center text-[10px] flex-shrink-0">1</span>
                     <div>
                         <strong class="text-champagne-200 block mb-0.5">Нажмите «Сделать Снимок»</strong>
-                        <p class="text-stone-400 text-[11px]">Откроется системная камера вашего смартфона.</p>
+                        <p class="text-stone-400 text-[11px]">Откроется встроенная камера вашего смартфона.</p>
                     </div>
                 </div>
 
@@ -460,6 +445,12 @@
 
     <!-- JAVASCRIPT APPLICATION LOGIC -->
     <script>
+        // Конфигурация Автоматического Сохранения в Облако Telegram
+        const CLOUD_CONFIG = {
+            telegramBotToken: "", // Вставьте токен вашего Telegram-бота (например: "123456789:ABCdefGhIJKlmNo")
+            telegramChatId: ""     // Вставьте ID чата или юзернейм канала (например: "@wedding_channel" или "-100123456789")
+        };
+
         // App State Variables
         const MAX_SHOTS = 15;
         let guestId = localStorage.getItem('wedding_guest_id') || ('guest_' + Math.random().toString(36).substring(2, 9));
@@ -519,7 +510,7 @@
                 const canvas = document.getElementById('hidden-canvas');
                 const ctx = canvas.getContext('2d');
                 
-                // Scale photo size for speed and local storage limits (Max 1200px)
+                // Scale photo size for performance & local storage limit (Max 1200px)
                 let w = img.width;
                 let h = img.height;
                 const maxDim = 1200;
@@ -609,10 +600,41 @@
             renderMiniGallery();
             renderSharedAlbumFromLocal();
 
+            // Автоматическая загрузка в облако
+            uploadToCloud(photoDataUrl, guestName);
+
             if (shotsTaken >= MAX_SHOTS) {
                 setTimeout(() => openModal('modal-finished'), 400);
             } else {
                 showToast(`Снимок ${shotsTaken} из ${MAX_SHOTS} сохранен!`);
+            }
+        }
+
+        async function uploadToCloud(base64Image, authorName) {
+            if (!CLOUD_CONFIG.telegramBotToken || !CLOUD_CONFIG.telegramChatId) {
+                return;
+            }
+
+            try {
+                const response = await fetch(base64Image);
+                const blob = await response.blob();
+
+                const formData = new FormData();
+                formData.append("chat_id", CLOUD_CONFIG.telegramChatId);
+                formData.append("photo", blob, `wedding_${Date.now()}.jpg`);
+                formData.append("caption", `📸 Новое фото от гостя: ${authorName}\n❤️ ${weddingSettings.names}`);
+
+                fetch(`https://api.telegram.org/bot${CLOUD_CONFIG.telegramBotToken}/sendPhoto`, {
+                    method: "POST",
+                    body: formData
+                }).then(res => res.json()).then(data => {
+                    if (data.ok) {
+                        console.log("Фото успешно отправлено в Telegram-облако!");
+                    }
+                }).catch(err => console.error("Ошибка сети при отправке в облако:", err));
+
+            } catch (e) {
+                console.error("Ошибка отправки в облако:", e);
             }
         }
 
@@ -835,17 +857,6 @@
             };
             img.src = qrApiUrl;
         }
-
-        window.authenticateAdmin = function() {
-            const pin = document.getElementById('admin-pin-input').value.trim();
-            if (pin === "2026" || pin === "1234") {
-                document.getElementById('admin-auth-container').classList.add('hidden');
-                document.getElementById('admin-dashboard-content').classList.remove('hidden');
-                document.getElementById('admin-dashboard-content').classList.add('flex');
-            } else {
-                showToast("Неверный ПИН-код! Введите 2026.");
-            }
-        };
 
         window.saveWeddingSettings = function() {
             const names = document.getElementById('cfg-wedding-names').value.trim();

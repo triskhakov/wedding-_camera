@@ -637,43 +637,64 @@
             renderMiniGallery();
             renderSharedAlbumFromLocal();
 
-            // Автоматическая загрузка в Telegram-облако
-            uploadToCloud(photoDataUrl, currentAuthor);
+          // Автоматическая загрузка в Telegram-облако
+        uploadToCloud(photoDataUrl, currentAuthor);
 
-            if (shotsTaken >= MAX_SHOTS) {
-                setTimeout(() => openModal('modal-finished'), 400);
-            } else {
-                showToast(`Снимок ${shotsTaken} из ${MAX_SHOTS} сохранен!`);
-            }
+        if (shotsTaken >= MAX_SHOTS) {
+            setTimeout(() => openModal('modal-finished'), 400);
+        } else {
+            showToast(`Снимок ${shotsTaken} из ${MAX_SHOTS} сохранен!`);
+        }
+    }
+
+    async function uploadToCloud(base64Image, authorName) {
+        if (!CLOUD_CONFIG.telegramBotToken || !CLOUD_CONFIG.telegramChatId) {
+            return;
         }
 
-        async function uploadToCloud(base64Image, authorName) {
-            if (!CLOUD_CONFIG.telegramBotToken || !CLOUD_CONFIG.telegramChatId) {
-                return;
-            }
+        try {
+            const response = await fetch(base64Image);
+            const blob = await response.blob();
+            const fileName = `wedding_${Date.now()}.jpg`;
+            const captionText = `📸 Новое фото от гостя: ${authorName}\n❤️ ${weddingSettings.names}`;
 
-            try {
-                const response = await fetch(base64Image);
-                const blob = await response.blob();
+            // 1. Форма для отправки обычного фото (с предпросмотром)
+            const photoFormData = new FormData();
+            photoFormData.append("chat_id", CLOUD_CONFIG.telegramChatId);
+            photoFormData.append("photo", blob, fileName);
+            photoFormData.append("caption", captionText);
 
-                const formData = new FormData();
-                formData.append("chat_id", CLOUD_CONFIG.telegramChatId);
-                formData.append("photo", blob, `wedding_${Date.now()}.jpg`);
-                formData.append("caption", `📸 Новое фото от гостя: ${authorName}\n❤️ ${weddingSettings.names}`);
+            // 2. Форма для отправки оригинала документом (без сжатия)
+            const docFormData = new FormData();
+            docFormData.append("chat_id", CLOUD_CONFIG.telegramChatId);
+            docFormData.append("document", blob, fileName);
+            docFormData.append("caption", "📎 Оригинал в высоком качестве");
 
+            // Отправляем оба запроса одновременно
+            Promise.all([
                 fetch(`https://api.telegram.org/bot${CLOUD_CONFIG.telegramBotToken}/sendPhoto`, {
                     method: "POST",
-                    body: formData
-                }).then(res => res.json()).then(data => {
-                    if (data.ok) {
-                        console.log("Фото успешно отправлено в Telegram-облако!");
-                    }
-                }).catch(err => console.error("Ошибка сети при отправке в облако:", err));
+                    body: photoFormData
+                }),
+                fetch(`https://api.telegram.org/bot${CLOUD_CONFIG.telegramBotToken}/sendDocument`, {
+                    method: "POST",
+                    body: docFormData
+                })
+            ]).then(async ([photoRes, docRes]) => {
+                const photoData = await photoRes.json();
+                const docData = await docRes.json();
 
-            } catch (e) {
-                console.error("Ошибка отправки в облако:", e);
-            }
+                if (photoData.ok && docData.ok) {
+                    console.log("Фото и оригинал файла успешно отправлены в Telegram!");
+                } else {
+                    console.error("Ошибка Telegram API:", photoData, docData);
+                }
+            }).catch(err => console.error("Ошибка сети при отправке в облако:", err));
+
+        } catch (e) {
+            console.error("Ошибка подготовки файла для Telegram:", e);
         }
+    }
 
         function renderSharedAlbumFromLocal() {
             const grid = document.getElementById('shared-album-grid');

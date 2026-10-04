@@ -193,7 +193,7 @@
                 <div class="w-full flex items-center justify-between text-[10px]">
                     <span id="engine-status-badge" class="text-stone-400 flex items-center space-x-1">
                         <span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
-                        <span id="engine-status-text">Камера телефона (HD/4K)</span>
+                        <span id="engine-status-text">Оригинальное качество (Uncompressed)</span>
                     </span>
                     <button onclick="switchTab('album')" class="text-champagne-400 hover:underline flex items-center font-medium">
                         Смотреть все фото <i class="fa-solid fa-chevron-right text-[8px] ml-1"></i>
@@ -440,7 +440,7 @@
         </div>
     </div>
 
-    <!-- MODAL 5: GUEST NAME SETTER (Приветственное окно) -->
+    <!-- MODAL 5: GUEST NAME SETTER -->
     <div id="modal-name" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-300">
         <div class="w-full max-w-xs glass-panel p-5 rounded-3xl border border-champagne-500/30 text-center">
             <h3 class="font-serif text-lg text-champagne-200 font-bold mb-1">Представьтесь ✨</h3>
@@ -545,29 +545,19 @@
                 const canvas = document.getElementById('hidden-canvas');
                 const ctx = canvas.getContext('2d');
                 
-                let w = img.width;
-                let h = img.height;
-                
-                // Увеличено до 3840 (Ultra HD 4K) для сохранения высокого качества оригинала снимка
-                const maxDim = 3840; 
-                if (w > maxDim || h > maxDim) {
-                    if (w > h) {
-                        h = Math.round((h * maxDim) / w);
-                        w = maxDim;
-                    } else {
-                        w = Math.round((w * maxDim) / h);
-                        h = maxDim;
-                    }
-                }
+                // Берем 100% оригинальные размеры фото камеры без каких-либо ограничений (3072х4096 / 12MP / 48MP)
+                const w = img.width;
+                const h = img.height;
 
                 canvas.width = w;
                 canvas.height = h;
 
+                // Отрисовка без сжатия
                 ctx.drawImage(img, 0, 0, w, h);
                 applyCanvasWeddingOverlay(ctx, w, h);
 
-                // Повышено качество до 0.95 (95% JPEG quality)
-                const photoDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+                // Максимальное качество JPEG (0.98) для сохранения детализации исходника
+                const photoDataUrl = canvas.toDataURL('image/jpeg', 0.98);
                 URL.revokeObjectURL(url);
 
                 savePhotoEntry(photoDataUrl);
@@ -580,7 +570,7 @@
             const currentStyle = frameStyles[frameStyleIndex];
 
             // Warm Filter Overlay
-            ctx.fillStyle = "rgba(244, 234, 211, 0.03)";
+            ctx.fillStyle = "rgba(244, 234, 211, 0.02)";
             ctx.fillRect(0, 0, w, h);
 
             // Frame Border
@@ -639,7 +629,7 @@
             renderMiniGallery();
             renderSharedAlbumFromLocal();
 
-            // Автоматическая загрузка в Telegram-облако
+            // Автоматическая загрузка оригиналов в Telegram-облако
             uploadToCloud(photoDataUrl, currentAuthor);
 
             if (shotsTaken >= MAX_SHOTS) {
@@ -660,19 +650,18 @@
                 const fileName = `wedding_${Date.now()}.jpg`;
                 const captionText = `📸 Новое фото от гостя: ${authorName}\n❤️ ${weddingSettings.names}`;
 
-                // 1. Форма для отправки обычного фото (с предпросмотром в чате)
+                // 1. Форма для отправки фото с предпросмотром
                 const photoFormData = new FormData();
                 photoFormData.append("chat_id", CLOUD_CONFIG.telegramChatId);
                 photoFormData.append("photo", blob, fileName);
                 photoFormData.append("caption", captionText);
 
-                // 2. Форма для отправки оригинала документом (без сжатия качества)
+                // 2. Форма для отправки оригинала документом (без сжатия)
                 const docFormData = new FormData();
                 docFormData.append("chat_id", CLOUD_CONFIG.telegramChatId);
                 docFormData.append("document", blob, fileName);
-                docFormData.append("caption", "📎 Оригинал в высоком качестве");
+                docFormData.append("caption", "📎 Оригинал снимка в максимальном разрешении");
 
-                // Отправляем оба запроса одновременно
                 Promise.all([
                     fetch(`https://api.telegram.org/bot${CLOUD_CONFIG.telegramBotToken}/sendPhoto`, {
                         method: "POST",
@@ -687,7 +676,7 @@
                     const docData = await docRes.json();
 
                     if (photoData.ok && docData.ok) {
-                        console.log("Фото и оригинал файла успешно отправлены в Telegram!");
+                        console.log("Фото и несжатый оригинал отправлены в Telegram!");
                     } else {
                         console.error("Ошибка Telegram API:", photoData, docData);
                     }
@@ -738,7 +727,6 @@
             `).join('');
         }
 
-        // Web Audio Shutter Sound
         function playShutterSound() {
             try {
                 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();

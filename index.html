@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Анвар & Угилжон • Свадебная Камера</title>
+    <title>Anvar & Ugiljon • Свадебная Камера</title>
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -118,7 +118,7 @@
                 </div>
                 <div>
                     <h1 class="font-serif text-base font-bold tracking-wide text-champagne-200 leading-none" id="wedding-title">
-                        Анвар & Угилжон
+                        Anvar & Ugiljon
                     </h1>
                     <p class="text-[10px] text-stone-400 tracking-wider uppercase" id="wedding-date">09.11.2026</p>
                 </div>
@@ -182,7 +182,7 @@
                 <div class="w-full flex items-center justify-between text-[10px]">
                     <span id="engine-status-badge" class="text-stone-400 flex items-center space-x-1">
                         <span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
-                        <span id="engine-status-text">Оригинальное качество (Uncompressed)</span>
+                        <span id="engine-status-text">Оригинальное качество</span>
                     </span>
                     <button onclick="switchTab('album')" class="text-champagne-400 hover:underline flex items-center font-medium">
                         Смотреть все фото <i class="fa-solid fa-chevron-right text-[8px] ml-1"></i>
@@ -310,7 +310,7 @@
                     <h4 class="font-serif text-md font-bold text-champagne-200"><i class="fa-solid fa-pen-to-square mr-1.5 text-champagne-400"></i>Текст на снимках</h4>
                     <div>
                         <label class="block text-[11px] text-stone-400 mb-1">Имена новобрачных</label>
-                        <input id="cfg-wedding-names" type="text" value="Анвар & Угилжон" class="w-full px-3 py-2 rounded-lg bg-stone-900 border border-stone-700 text-xs text-stone-200">
+                        <input id="cfg-wedding-names" type="text" value="Anvar & Ugiljon" class="w-full px-3 py-2 rounded-lg bg-stone-900 border border-stone-700 text-xs text-stone-200">
                     </div>
                     <div>
                         <label class="block text-[11px] text-stone-400 mb-1">Дата свадьбы</label>
@@ -404,7 +404,7 @@
         <div class="w-full max-w-sm glass-panel p-5 rounded-3xl border border-champagne-500/40 text-center max-h-[92vh] overflow-y-auto">
             
             <div id="printable-card" class="bg-white p-5 rounded-2xl text-stone-950 shadow-2xl mb-4 border border-stone-300">
-                <p class="font-serif text-lg font-bold text-amber-900 leading-tight">❤️ <span id="card-names">Анвар & Угилжон</span></p>
+                <p class="font-serif text-lg font-bold text-amber-900 leading-tight">❤️ <span id="card-names">Anvar & Ugiljon</span></p>
                 <p class="text-[10px] text-stone-500 font-mono tracking-widest uppercase mb-3" id="card-date">09.11.2026</p>
                 
                 <div class="bg-white p-2 border-2 border-stone-900 rounded-xl inline-block shadow-inner mb-2">
@@ -464,7 +464,7 @@
         let guestPhotos = JSON.parse(localStorage.getItem(`wedding_local_photos_${guestId}`) || '[]');
 
         let weddingSettings = {
-            names: localStorage.getItem('wedding_cfg_names') || "Анвар & Угилжон",
+            names: localStorage.getItem('wedding_cfg_names') || "Anvar & Ugiljon",
             date: localStorage.getItem('wedding_cfg_date') || "09.11.2026",
             siteUrl: localStorage.getItem('wedding_cfg_url') || window.location.href
         };
@@ -611,7 +611,7 @@
                 const response = await fetch(base64Image);
                 const blob = await response.blob();
                 const fileName = `wedding_${Date.now()}.jpg`;
-                const captionText = `📸 Новое фото от гостя: ${authorName}\n❤️ ${weddingSettings.names}`;
+                const captionText = `📸 Фото от гостя: ${authorName}\n❤️ ${weddingSettings.names}`;
 
                 // 1. Форма для отправки фото с предпросмотром
                 const photoFormData = new FormData();
@@ -623,7 +623,7 @@
                 const docFormData = new FormData();
                 docFormData.append("chat_id", CLOUD_CONFIG.telegramChatId);
                 docFormData.append("document", blob, fileName);
-                docFormData.append("caption", "📎 Оригинал снимка в максимальном разрешении");
+                docFormData.append("caption", "📎 Оригинал снимка");
 
                 Promise.all([
                     fetch(`https://api.telegram.org/bot${CLOUD_CONFIG.telegramBotToken}/sendPhoto`, {
@@ -639,7 +639,7 @@
                     const docData = await docRes.json();
 
                     if (photoData.ok && docData.ok) {
-                        console.log("Фото и несжатый оригинал отправлены в Telegram!");
+                        console.log("Фотографии отправлены в Telegram!");
                     } else {
                         console.error("Ошибка Telegram API:", photoData, docData);
                     }

@@ -14,6 +14,7 @@ function fixture({ width = 8000, height = 6000, decode = 'success', storedNames 
     encodedSize = () => 300, uploadError = null } = {}) {
     const encodings = [], overlays = [], posts = [], storage = [], timers = new Map(), revoked = [];
     let timerId = 0;
+    let now = Date.now();
     const canvas = {
         width: 0, height: 0,
         getContext() { return { drawImage() {} }; },
@@ -26,6 +27,7 @@ function fixture({ width = 8000, height = 6000, decode = 'success', storedNames 
     const elements = new Map([['hidden-canvas', canvas]]);
     const context = {
         console, Blob, File, FormData, AbortController, crypto: webcrypto,
+        Date: class extends Date { static now() { return now; } },
         location: { href: 'https://wedding.example/' },
         setTimeout(action, delay) { const id = ++timerId; timers.set(id, { action, delay }); return id; },
         clearTimeout(id) { timers.delete(id); },
@@ -77,7 +79,15 @@ function fixture({ width = 8000, height = 6000, decode = 'success', storedNames 
         context.captureEvent = { target: { files: [file], value: 'camera-image' } };
         await run('handleNativeCameraCapture(captureEvent)');
     }
-    return { capture, context, run, canvas, encodings, overlays, posts, storage, timers, revoked, original, elements };
+    async function fireRetry() {
+        const entry = [...timers].find(([, timer]) => timer.delay < 75000);
+        assert.ok(entry, 'expected one scheduled retry');
+        const [id, timer] = entry;
+        timers.delete(id);
+        now += timer.delay;
+        await timer.action();
+    }
+    return { capture, context, run, canvas, encodings, overlays, posts, storage, timers, revoked, original, elements, fireRetry };
 }
 
 test('48MP capture sends separate preview and unmodified original bytes/name/type', async () => {
@@ -125,27 +135,56 @@ test('oversized preview is recompressed without changing the original', async ()
     assert.deepEqual(new Uint8Array(await f.posts[0].body.get('document').arrayBuffer()), originalBytes);
 });
 
-test('original over20MiB is explicitly rejected without compression or upload', async () => {
+test('original over50MB is explicitly rejected without compression or upload', async () => {
     const f = fixture();
-    await f.capture({ size: 21 * MiB, type: 'image/jpeg', name: 'huge.jpg' });
+    await f.capture({ size: 50_000_001, type: 'image/jpeg', name: 'huge.jpg' });
     assert.equal(f.posts.length, 0);
     assert.equal(f.encodings.length, 0);
-    assert.match(f.run('toasts.at(-1)'), /Оригинал превышает 20 МБ/);
+    assert.match(f.run('toasts.at(-1)'), /Оригинал превышает 50 МБ/);
 });
 
-test('decode failure and timeout show descriptive errors and do not upload', async () => {
+test('decode failure and timeout still upload unchanged original without a preview', async () => {
     const failed = fixture({ decode: 'failure' });
     await failed.capture();
-    assert.equal(failed.posts.length, 0);
-    assert.match(failed.run('toasts.at(-1)'), /Браузер не смог открыть снимок/);
+    assert.equal(failed.posts.length, 1);
+    assert.equal(failed.posts[0].body.get('preview'), null);
+    assert.deepEqual(new Uint8Array(await failed.posts[0].body.get('document').arrayBuffer()), originalBytes);
+    assert.match(failed.run('toasts[0]'), /Отправляем исходный файл/);
+    assert.match(failed.run('guestPhotos[0].photoData'), /^data:image\/svg\+xml/);
     assert.equal(failed.run('captureBusy'), false);
     const timedOut = fixture({ decode: 'timeout' });
     const pending = timedOut.capture();
     [...timedOut.timers.values()].find(timer => timer.delay === 30000).action();
     await pending;
-    assert.equal(timedOut.posts.length, 0);
-    assert.match(timedOut.run('toasts.at(-1)'), /слишком долго/);
+    assert.equal(timedOut.posts.length, 1);
+    assert.equal(timedOut.posts[0].body.get('preview'), null);
+    assert.deepEqual(new Uint8Array(await timedOut.posts[0].body.get('document').arrayBuffer()), originalBytes);
     assert.equal(timedOut.run('captureBusy'), false);
+});
+
+test('preview encoder failure never blocks the original', async () => {
+    const f = fixture({ encodedSize: () => null });
+    await f.capture();
+    assert.equal(f.posts.length, 1);
+    assert.equal(f.posts[0].body.get('preview'), null);
+    assert.deepEqual(new Uint8Array(await f.posts[0].body.get('document').arrayBuffer()), originalBytes);
+    assert.equal(f.canvas.width, 0);
+    assert.equal(f.canvas.height, 0);
+});
+
+test('25MB original is sent byte-for-byte without resizing or compression', async () => {
+    const f = fixture();
+    const data = new Uint8Array(25_000_000);
+    data.set(originalBytes);
+    data[data.length - 1] = 71;
+    const original = new File([data], 'large-original.HEIC', { type: 'image/heic' });
+    await f.capture(original);
+    assert.equal(f.posts.length, 1);
+    const document = f.posts[0].body.get('document');
+    assert.equal(document.size, data.length);
+    assert.equal(document.name, 'large-original.HEIC');
+    assert.equal(document.type, 'image/heic');
+    assert.deepEqual(new Uint8Array(await document.arrayBuffer()), data);
 });
 
 test('camera data exists only in current-tab RAM and lightbox downloads original', async () => {
@@ -173,7 +212,98 @@ test('INVALID_NAME is a permanent rejection and displays server message as text'
     const f = fixture({ uploadError: { ok: false, code: 'INVALID_NAME', message } });
     await f.capture();
     assert.equal(f.run('guestPhotos[0].status'), 'rejected');
-    assert.equal(f.run('toasts.at(-1)'), message);
+    assert.ok(f.run('toasts.at(-1)').includes(message));
+    assert.match(f.run('toasts.at(-1)'), /INVALID_NAME/);
+    await f.run('retryPendingPhotos()');
+    assert.equal(f.posts.length, 1);
+});
+
+test('malformed UTF16 name cannot throw before fetch', async () => {
+    const f = fixture();
+    f.run("guestName = '\\ud800'");
+    await f.capture();
+    assert.equal(f.posts.length, 1);
+    assert.equal(decodeURIComponent(f.posts[0].headers['X-Guest-Name']), '\uFFFD');
+});
+
+test('request construction failure is distinct from network failure and never retried', async () => {
+    const f = fixture();
+    f.context.FormData = class { append() { throw new TypeError('Unsupported append'); } };
+    await f.capture();
+    assert.equal(f.posts.length, 0);
+    assert.equal(f.run('guestPhotos[0].status'), 'rejected');
+    assert.match(f.run('toasts.at(-1)'), /UPLOAD_PREPARE/);
+    assert.equal(f.timers.size, 0);
+});
+
+test('missing AbortController still permits upload', async () => {
+    const f = fixture();
+    f.context.AbortController = undefined;
+    await f.capture();
+    assert.equal(f.posts.length, 1);
+    assert.equal(f.run('guestPhotos[0].status'), 'delivered');
+});
+
+test('nonJSON gateway response reports HTTP status and retries without exposing response contents', async () => {
+    const f = fixture();
+    f.context.fetch = async () => ({ ok: false, status: 502, json: async () => { throw Error('private response content'); } });
+    await f.capture();
+    assert.match(f.run('toasts.at(-1)'), /HTTP 502, NON_JSON_RESPONSE/);
+    assert.doesNotMatch(f.run('toasts.at(-1)'), /private response content/);
+    assert.equal(f.run('guestPhotos[0].retryable'), true);
+    assert.equal(f.timers.size, 1);
+});
+
+test('network retry queue is bounded to three retries and always reuses photo ID and original bytes', async () => {
+    const f = fixture();
+    const requests = [];
+    f.context.fetch = async (url, options) => { requests.push(options); throw TypeError('Failed to fetch'); };
+    await f.capture();
+    assert.match(f.run('toasts.at(-1)'), /UPLOAD_NETWORK/);
+    for (let attempt = 0; attempt < 3; attempt++) await f.fireRetry();
+    assert.equal(requests.length, 4);
+    assert.equal(new Set(requests.map(request => request.headers['X-Photo-Id'])).size, 1);
+    for (const request of requests) assert.deepEqual(new Uint8Array(await request.body.get('document').arrayBuffer()), originalBytes);
+    assert.equal(f.run('guestPhotos[0].retryCount'), 3);
+    assert.equal(f.timers.size, 0);
+});
+
+test('busy response schedules retry; delivered response clears retry queue', async () => {
+    const f = fixture({ uploadError: { ok: false, code: 'SERVER_BUSY', message: 'Busy' } });
+    await f.capture();
+    assert.equal(f.run('guestPhotos[0].status'), 'pending');
+    assert.equal(f.timers.size, 1);
+    f.context.fetch = async (url, options) => ({ ok: true, status: 200, json: async () => ({ ok: true, photoId: options.headers['X-Photo-Id'], remaining: 14 }) });
+    await f.fireRetry();
+    assert.equal(f.run('guestPhotos[0].status'), 'delivered');
+    assert.equal(f.timers.size, 0);
+});
+
+test('only one retry worker uploads even when online and timer triggers overlap', async () => {
+    const f = fixture({ uploadError: { ok: false, code: 'SERVER_BUSY', message: 'Busy' } });
+    await f.capture();
+    let calls = 0, resolveRequest;
+    f.context.fetch = (url, options) => {
+        calls++;
+        return new Promise(resolve => {
+            resolveRequest = () => resolve({ ok: true, status: 200,
+                json: async () => ({ ok: true, photoId: options.headers['X-Photo-Id'], remaining: 14 }) });
+        });
+    };
+    const pending = f.fireRetry();
+    await f.run('retryPendingPhotos()');
+    assert.equal(calls, 1);
+    resolveRequest();
+    await pending;
+    assert.equal(f.run('guestPhotos[0].status'), 'delivered');
+    assert.equal(f.timers.size, 0);
+});
+
+test('UNKNOWN_DELIVERY never creates a retry timer', async () => {
+    const f = fixture({ uploadError: { ok: false, code: 'UNKNOWN_DELIVERY' } });
+    await f.capture();
+    assert.equal(f.run('guestPhotos[0].status'), 'unknown');
+    assert.equal(f.timers.size, 0);
     await f.run('retryPendingPhotos()');
     assert.equal(f.posts.length, 1);
 });

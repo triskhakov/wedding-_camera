@@ -451,8 +451,9 @@
     <script>
         // Credentials and upload limits are enforced by the same-origin server.
         let MAX_SHOTS = 15;
-        const MAX_FILE_BYTES = 20 * 1024 * 1024;
+        const MAX_FILE_BYTES = 50_000_000;
         const MAX_PREVIEW_BYTES = 1024 * 1024;
+        const NO_PREVIEW_IMAGE = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480"><rect width="640" height="480" fill="#1c1917"/><g fill="none" stroke="#d4af37" stroke-width="8"><path d="M220 190h55l20-30h50l20 30h55v140H220z"/><circle cx="320" cy="260" r="42"/></g></svg>');
         function readSetting(key, fallback = '') {
             try { return localStorage.getItem(key) || fallback; } catch { return fallback; }
         }
@@ -469,6 +470,9 @@
         let sessionReady = false;
         let captureBusy = false;
         const uploadingIds = new Set();
+        let retryTimer = null;
+        let retryWorkerBusy = false;
+        const RETRY_DELAYS = [2000, 8000, 20000];
         const defaultWeddingNames = 'Anvar & Oʻgʻiljon';
         let storedWeddingNames = readSetting('wedding_cfg_names', defaultWeddingNames);
         if (storedWeddingNames === 'Anvar & Ugiljon') {
@@ -607,19 +611,25 @@
         window.handleNativeCameraCapture = async function(event) {
             const file = event.target.files && event.target.files[0];
             if (!file || captureBusy) return;
-            if (file.type && !file.type.startsWith('image/')) {
+            if (file.type && !file.type.startsWith('image/') && file.type !== 'application/octet-stream') {
                 showToast('Выберите изображение, а не другой файл.'); event.target.value = ''; return;
             }
             if (file.size > MAX_FILE_BYTES) {
-                showToast('Оригинал превышает 20 МБ. Выберите другой снимок: оригиналы отправляются без сжатия.'); event.target.value = ''; return;
+                showToast('Оригинал превышает 50 МБ. Выберите другой снимок: оригиналы отправляются без сжатия.'); event.target.value = ''; return;
             }
             captureBusy = true;
             engineStatus('Подготовка снимка…');
             let url;
             try {
                 url = URL.createObjectURL(file);
-                const img = await decodeCaptureImage(url);
-                const preview = await preparePreviewBlob(img);
+                let preview = null;
+                try {
+                    const img = await decodeCaptureImage(url);
+                    preview = await preparePreviewBlob(img);
+                } catch {
+                    engineStatus('Превью недоступно. Отправляется оригинал…');
+                    showToast('Браузер не смог создать превью. Отправляем исходный файл без сжатия.');
+                }
                 playShutterSound(); triggerFlash();
                 await savePhotoEntry(file, preview);
             } catch (error) {
@@ -659,56 +669,130 @@
 
         async function savePhotoEntry(blob, previewBlob) {
             const photo = { id: crypto.randomUUID(), guestId, guestName: guestName || 'Гость', timestamp: Date.now(), blob, previewBlob, originalName: blob.name || 'wedding-original.jpg', status: 'pending' };
-            photo.photoData = URL.createObjectURL(previewBlob);
+            photo.photoData = previewBlob ? URL.createObjectURL(previewBlob) : NO_PREVIEW_IMAGE;
             photo.originalData = URL.createObjectURL(blob);
             guestPhotos.unshift(photo);
             renderMiniGallery(); renderSharedAlbumFromLocal();
             await uploadToCloud(photo);
         }
-        async function retryPendingPhotos() {
-            for (const photo of guestPhotos) {
-                if (photo.status === 'pending' || photo.status === 'uploading') await uploadToCloud(photo);
-            }
+        function schedulePendingRetries() {
+            if (retryTimer !== null) { clearTimeout(retryTimer); retryTimer = null; }
+            if (retryWorkerBusy || uploadingIds.size || !uploadsEnabled) return;
+            const pending = guestPhotos.filter(photo => photo.status === 'pending' && photo.retryable && (photo.retryCount || 0) < RETRY_DELAYS.length);
+            if (!pending.length) return;
+            const due = Math.min(...pending.map(photo => photo.nextRetryAt || Date.now()));
+            retryTimer = setTimeout(() => { retryTimer = null; return retryPendingPhotos(true); }, Math.max(0, due - Date.now()));
+        }
+        function queuePhotoRetry(photo) {
+            const attempts = photo.retryCount || 0;
+            photo.retryable = attempts < RETRY_DELAYS.length;
+            if (photo.retryable) photo.nextRetryAt = Date.now() + RETRY_DELAYS[attempts];
+        }
+        async function retryPendingPhotos(automatic = false) {
+            if (retryWorkerBusy || uploadingIds.size) return;
+            retryWorkerBusy = true;
+            if (retryTimer !== null) { clearTimeout(retryTimer); retryTimer = null; }
+            try {
+                for (const photo of guestPhotos) {
+                    if (photo.status !== 'pending' || !photo.retryable || (photo.retryCount || 0) >= RETRY_DELAYS.length) continue;
+                    if (automatic && photo.nextRetryAt > Date.now()) continue;
+                    photo.retryCount = (photo.retryCount || 0) + 1;
+                    await uploadToCloud(photo);
+                }
+            } finally { retryWorkerBusy = false; schedulePendingRetries(); }
+        }
+        function encodedGuestHeader(name) {
+            const value = String(name || 'Гость');
+            // Some older mobile keyboards can leave unpaired UTF-16 surrogates.
+            const safe = typeof value.toWellFormed === 'function' ? value.toWellFormed()
+                : value.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDFFF]/g, pair => pair.length === 2 ? pair : '\uFFFD');
+            return encodeURIComponent(safe);
         }
         async function uploadToCloud(photo) {
-            if (!uploadsEnabled || uploadingIds.has(photo.id) || photo.status === 'unknown' || photo.status === 'delivered' || photo.status === 'rejected') return;
+            if (!uploadsEnabled || uploadingIds.has(photo.id) || ['unknown', 'delivered', 'rejected'].includes(photo.status)) return;
+            if (uploadingIds.size) { photo.retryable = true; photo.nextRetryAt = Date.now(); return; }
             uploadingIds.add(photo.id);
             engineStatus('Отправляется…');
+            let stage = 'prepare';
+            let timeout;
             try {
                 photo.status = 'uploading';
-                const controller = new AbortController();
-                const timeout = setTimeout(() => controller.abort(), 75000);
-                let response, result;
                 const form = new FormData();
-                form.append('preview', photo.previewBlob, 'preview.jpg');
+                if (photo.previewBlob) form.append('preview', photo.previewBlob, 'preview.jpg');
                 form.append('document', photo.blob, photo.originalName);
-                try {
-                    response = await fetch('/api/photos', {
-                    method: 'POST', credentials: 'same-origin',
-                    headers: { 'X-Photo-Id': photo.id, 'X-Guest-Name': encodeURIComponent(photo.guestName) },
-                    body: form, signal: controller.signal
+                const headers = { 'X-Photo-Id': photo.id, 'X-Guest-Name': encodedGuestHeader(photo.guestName) };
+                const controller = typeof AbortController === 'function' ? new AbortController() : null;
+                stage = 'request';
+                const timeoutPromise = new Promise((resolve, reject) => {
+                    timeout = setTimeout(() => {
+                        if (controller) controller.abort();
+                        const error = new Error('Upload timeout'); error.uploadCode = 'UPLOAD_TIMEOUT'; reject(error);
+                    }, 240000);
+                });
+                const requestPromise = (async () => {
+                    const response = await fetch('/api/photos', {
+                        method: 'POST', credentials: 'same-origin', headers,
+                        body: form, ...(controller ? { signal: controller.signal } : {})
                     });
-                    result = await response.json();
-                } finally { clearTimeout(timeout); }
+                    stage = 'response';
+                    let result;
+                    try { result = await response.json(); }
+                    catch {
+                        const error = new Error('Invalid server response');
+                        error.uploadCode = 'NON_JSON_RESPONSE'; error.httpStatus = response.status; throw error;
+                    }
+                    if (!result || typeof result !== 'object' || Array.isArray(result)) {
+                        const error = new Error('Invalid response shape');
+                        error.uploadCode = 'INVALID_RESPONSE'; error.httpStatus = response.status; throw error;
+                    }
+                    return { response, result };
+                })();
+                const { response, result } = await Promise.race([requestPromise, timeoutPromise]);
                 if (response.ok && result.ok === true && result.photoId === photo.id) {
-                    photo.status = 'delivered';
+                    photo.status = 'delivered'; photo.retryable = false;
                     if (Number.isInteger(result.remaining)) shotsTaken = MAX_SHOTS - result.remaining;
-                    updateShotsCounterUI();
-                    engineStatus('Оригинальное качество');
+                    updateShotsCounterUI(); engineStatus('Оригинальное качество');
                     showToast('Снимок доставлен в архив!');
                     if (shotsTaken >= MAX_SHOTS && guestPhotos.every(p => p.status === 'delivered')) openModal('modal-finished');
                 } else {
-                    photo.status = result.code === 'UNKNOWN_DELIVERY' ? 'unknown' : ['FILE_TOO_LARGE', 'INVALID_IMAGE', 'INVALID_NAME', 'INVALID_GUEST_NAME', 'INVALID_PREVIEW', 'INVALID_DOCUMENT', 'INVALID_PHOTO_ID', 'PHOTO_ID_CONFLICT'].includes(result.code) ? 'rejected' : 'pending';
+                    const code = typeof result.code === 'string' ? result.code : 'INVALID_RESPONSE';
+                    const safeCode = /^[A-Z0-9_]{1,50}$/.test(code) ? code : 'SERVER_ERROR';
+                    const permanent = ['FILE_TOO_LARGE', 'INVALID_IMAGE', 'INVALID_NAME', 'INVALID_GUEST_NAME', 'INVALID_PREVIEW', 'INVALID_DOCUMENT', 'INVALID_PHOTO_ID', 'PHOTO_ID_CONFLICT'];
+                    photo.status = code === 'UNKNOWN_DELIVERY' ? 'unknown' : permanent.includes(code) ? 'rejected' : 'pending';
+                    photo.retryable = false;
+                    if (photo.status === 'pending' && (response.status === 429 || ['SERVER_BUSY', 'DELIVERY_IN_PROGRESS'].includes(code))) queuePhotoRetry(photo);
                     engineStatus(photo.status === 'unknown' ? 'Проверьте доставку в архив' : photo.status === 'rejected' ? 'Фото не отправлено' : 'Фото ожидает отправки');
-                    const serverMessage = typeof result.message === 'string' ? result.message.slice(0, 500) : '';
-                    showToast(photo.status === 'unknown' ? 'Результат отправки неизвестен. Организатору нужно проверить Telegram; автоматического повтора не будет.' : serverMessage || (photo.status === 'rejected' ? 'Сервер отклонил снимок. Проверьте формат, размер и имя гостя.' : 'Фото ожидает отправки в этой вкладке. При восстановлении связи повторим отправку. Не закрывайте страницу.'));
+                    const message = typeof result.message === 'string' ? result.message.slice(0, 350) : 'Сервер не подтвердил доставку.';
+                    showToast(photo.status === 'unknown' ? 'Результат отправки неизвестен. Организатору нужно проверить Telegram; автоматического повтора не будет.'
+                        : message + ' [HTTP ' + response.status + ', ' + safeCode + ']' + (photo.retryable ? ' Повторим отправку в этой вкладке.' : ''));
                     try { await refreshSession(); } catch {}
                 }
-            } catch {
-                if (photo.status !== 'delivered' && photo.status !== 'unknown' && photo.status !== 'rejected') photo.status = 'pending';
-                engineStatus('Фото ожидает отправки');
-                showToast('Нет подтверждения доставки. Фото остаётся только в этой вкладке. Не закрывайте страницу до отправки.');
-            } finally { uploadingIds.delete(photo.id); }
+            } catch (error) {
+                photo.retryable = false;
+                if (stage === 'prepare') {
+                    photo.status = 'rejected';
+                    engineStatus('Снимок не отправлен');
+                    showToast('Браузер не смог подготовить запрос загрузки [UPLOAD_PREPARE]. Откройте сайт в Safari или Chrome и сделайте снимок ещё раз.');
+                } else {
+                    photo.status = 'pending';
+                    const code = error && error.uploadCode;
+                    engineStatus('Фото ожидает отправки');
+                    if (code === 'NON_JSON_RESPONSE' || code === 'INVALID_RESPONSE') {
+                        const status = Number.isInteger(error.httpStatus) ? error.httpStatus : 0;
+                        if ([400, 413, 415].includes(status)) photo.status = 'rejected';
+                        showToast('Сервер вернул неверный ответ [HTTP ' + status + ', ' + code + ']. Доставка не подтверждена.');
+                        if ([429, 502, 503, 504].includes(status)) queuePhotoRetry(photo);
+                    } else {
+                        queuePhotoRetry(photo);
+                        const diagnostic = code === 'UPLOAD_TIMEOUT' || (error && error.name === 'AbortError') ? 'UPLOAD_TIMEOUT' : 'UPLOAD_NETWORK';
+                        showToast('Нет связи при отправке [' + diagnostic + ']. Фото остаётся только в этой вкладке.' + (photo.retryable ? ' Повторим отправку; не закрывайте страницу.' : ' Автоматические попытки закончились. Обратитесь к организатору; не закрывайте страницу.'));
+                    }
+                }
+            } finally {
+                if (timeout !== undefined) clearTimeout(timeout);
+                uploadingIds.delete(photo.id);
+                schedulePendingRetries();
+            }
         }
         function photoCard(photo, mini) {
             const card = document.createElement('div');

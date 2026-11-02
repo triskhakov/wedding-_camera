@@ -354,3 +354,91 @@ test('WebP original with vendor trailer preserves all container and trailer byte
   const res = await originalUpload(app, cookie, { original, preview: jpeg, name: 'camera.webp' });
   assert.equal(res.status, 200); assert.equal(app.calls(), 2);
 });
+
+function archiveTelegram({ filePath = 'photos/guest-camera.jpg' } = {}) {
+  const calls = [];
+  const fileBytes = Buffer.from('private guest original or preview bytes');
+  const telegram = async (url, options = {}) => {
+    calls.push({ url, options });
+    if (url.includes('/file/bot')) return new Response(fileBytes, { headers: { 'Content-Type': 'image/jpeg' } });
+    if (url.endsWith('/sendPhoto')) return { json: async () => ({ ok: true, result: { message_id: 1, photo: [{ file_id: 'private-preview-file-id', width: 1280, height: 960 }] } }) };
+    if (url.endsWith('/sendDocument')) return { json: async () => ({ ok: true, result: { message_id: 2, document: { file_id: 'private-original-file-id', file_size: jpeg.length } } }) };
+    if (url.endsWith('/getFile')) return { json: async () => ({ ok: true, result: { file_path: filePath, file_size: fileBytes.length } }) };
+    throw new Error('Unexpected outbound service');
+  };
+  return { telegram, calls, fileBytes };
+}
+
+test('archive lists only the cookie owner and never exposes Telegram file IDs or tokens', async t => {
+  const remote = archiveTelegram(); const app = fixture(t, remote);
+  const first = await app.session(); const second = await app.session();
+  const ownId = randomUUID(); const otherId = randomUUID();
+  assert.equal((await app.upload(first.cookie, { id: ownId })).status, 200);
+  assert.equal((await app.upload(second.cookie, { id: otherId })).status, 200);
+  const res = await app.request('/api/archive', { cookie: first.cookie });
+  assert.equal(res.status, 200); assert.match(res.headers.get('Cache-Control'), /no-store/);
+  const raw = await res.text();
+  assert.doesNotMatch(raw, /private-preview-file-id|private-original-file-id|test-token|api\.telegram\.org/);
+  const { photos } = JSON.parse(raw);
+  assert.deepEqual(photos.map(photo => photo.id), [ownId]);
+  assert.equal(photos[0].photoData, `/api/archive/${ownId}/preview`);
+  assert.equal(photos[0].originalData, `/api/archive/${ownId}/original`);
+  assert.equal(photos[0].guestName, 'Гость');
+  assert.equal(photos[0].originalSize, jpeg.length);
+  assert.equal((await app.request('/api/archive')).status, 401);
+  const saved = app.sqlite.prepare('SELECT document_file_id,preview_file_id FROM photos WHERE id=?').get(ownId);
+  assert.deepEqual({ ...saved }, { document_file_id: 'private-original-file-id', preview_file_id: 'private-preview-file-id' });
+});
+
+test('archive proxies only owner files and rejects invalid paths before any Telegram request', async t => {
+  const remote = archiveTelegram(); const app = fixture(t, remote);
+  const first = await app.session(); const second = await app.session(); const id = randomUUID();
+  assert.equal((await app.upload(first.cookie, { id })).status, 200);
+  const baseline = remote.calls.length;
+  assert.equal((await app.request(`/api/archive/${id}/original`, { cookie: second.cookie })).status, 404);
+  assert.equal((await app.request(`/api/archive/${id}/preview`)).status, 401);
+  for (const path of ['/api/archive/not-a-uuid/original', `/api/archive/${id}/https://evil.test`, `/api/archive/${id}/original/extra`]) {
+    assert.equal((await app.request(path, { cookie: first.cookie })).status, 404);
+  }
+  assert.equal(remote.calls.length, baseline);
+  for (const kind of ['preview', 'original']) {
+    const res = await app.request(`/api/archive/${id}/${kind}`, { cookie: first.cookie });
+    assert.equal(res.status, 200);
+    assert.deepEqual(Buffer.from(await res.arrayBuffer()), remote.fileBytes);
+    assert.match(res.headers.get('Cache-Control'), /no-store/);
+    assert.doesNotMatch(JSON.stringify([...res.headers]), /test-token|private-original-file-id|private-preview-file-id/);
+  }
+  assert.equal(remote.calls.length, baseline + 4);
+  assert.ok(remote.calls.filter(call => call.url.includes('/file/bot')).every(call => call.url.startsWith('https://api.telegram.org/file/bot')));
+  assert.ok(remote.calls.filter(call => call.url.includes('/file/bot')).every(call => call.options.redirect === 'error'));
+  assert.deepEqual(remote.calls.filter(call => call.url.endsWith('/getFile')).map(call => JSON.parse(call.options.body).file_id), ['private-preview-file-id', 'private-original-file-id']);
+});
+
+test('archive keeps historical metadata without file IDs and blocks oversized original proxies locally', async t => {
+  const remote = archiveTelegram(); const app = fixture(t, remote);
+  const { cookie } = await app.session(); const id = randomUUID();
+  assert.equal((await app.upload(cookie, { id })).status, 200);
+  app.sqlite.prepare('UPDATE photos SET original_size=? WHERE id=?').run(20_000_001, id);
+  const historical = randomUUID(); const sessionId = app.sqlite.prepare('SELECT id FROM sessions').get().id;
+  app.sqlite.prepare("INSERT INTO photos(id,session_id,status,created_at) VALUES (?,?,'delivered',?)").run(historical, sessionId, Date.now());
+  const baseline = remote.calls.length;
+  const res = await app.request('/api/archive', { cookie });
+  const { photos } = await res.json();
+  assert.equal(photos.find(photo => photo.id === id).originalData, null);
+  assert.equal(photos.find(photo => photo.id === historical).photoData, null);
+  assert.equal(photos.find(photo => photo.id === historical).originalData, null);
+  assert.ok((await app.request(`/api/archive/${id}/original`, { cookie })).status >= 400);
+  assert.equal((await app.request(`/api/archive/${historical}/preview`, { cookie })).status, 404);
+  assert.equal(remote.calls.length, baseline);
+});
+
+test('Telegram file paths cannot redirect archive downloads to another host', async t => {
+  const remote = archiveTelegram({ filePath: 'https://evil.test/private-file' }); const app = fixture(t, remote);
+  const { cookie } = await app.session(); const id = randomUUID();
+  assert.equal((await app.upload(cookie, { id })).status, 200);
+  const baseline = remote.calls.length;
+  const res = await app.request(`/api/archive/${id}/original`, { cookie });
+  assert.ok(res.status >= 400);
+  assert.equal(remote.calls.length, baseline + 1);
+  assert.ok(remote.calls.every(call => call.url.startsWith('https://api.telegram.org/')));
+});

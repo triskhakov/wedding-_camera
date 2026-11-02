@@ -235,7 +235,7 @@
                     <h2 class="font-serif text-xl text-champagne-200 font-bold">Свадебный Архив</h2>
                     <p class="text-xs text-stone-400">Все фотографии гостей свадьбы</p>
                 </div>
-                <button onclick="renderSharedAlbumFromLocal()" class="px-3 py-1.5 rounded-full bg-stone-800 border border-stone-700 text-xs text-champagne-300 hover:bg-stone-700">
+                <button onclick="refreshGuestArchive()" class="px-3 py-1.5 rounded-full bg-stone-800 border border-stone-700 text-xs text-champagne-300 hover:bg-stone-700">
                     <i class="fa-solid fa-rotate-right mr-1"></i> Обновить
                 </button>
             </div>
@@ -466,6 +466,7 @@
         let guestName = readSetting('wedding_guest_name');
         let shotsTaken = 0;
         let guestPhotos = [];
+        let archiveRequest = null;
         let uploadsEnabled = false;
         let sessionReady = false;
         let captureBusy = false;
@@ -509,6 +510,7 @@
             try {
                 await refreshSession();
                 engineStatus(uploadsEnabled ? 'Оригинальное качество' : 'Загрузка недоступна');
+                await refreshGuestArchive();
                 if (uploadsEnabled) await retryPendingPhotos();
                 if (guestPhotos.some(p => p.status === 'unknown')) engineStatus('Проверьте доставку в архив');
             } catch {
@@ -516,6 +518,60 @@
                 showToast('Не удалось подключиться к серверу. Проверьте соединение.');
             }
         });
+
+        function archiveFilePath(value, id, kind) {
+            const expected = '/api/archive/' + encodeURIComponent(id) + '/' + kind;
+            return value === expected ? value : null;
+        }
+        function archiveTelegramUrl(value) {
+            if (typeof value !== 'string') return null;
+            try {
+                const url = new URL(value);
+                return url.protocol === 'https:' && url.hostname === 't.me' && !url.username && !url.password ? url.href : null;
+            } catch { return null; }
+        }
+        function mergeGuestArchive(records) {
+            const photos = new Map(guestPhotos.map(photo => [photo.id, photo]));
+            for (const record of records) {
+                if (!record || typeof record.id !== 'string' || !/^[a-zA-Z0-9-]{1,100}$/.test(record.id)) continue;
+                const previous = photos.get(record.id);
+                const restored = {
+                    id: record.id, guestId, guestName: String(record.guestName || 'Гость'),
+                    timestamp: Number(record.timestamp) || Date.now(),
+                    originalName: String(record.originalName || 'wedding-original.jpg'),
+                    originalSize: Number(record.originalSize) || null,
+                    photoData: archiveFilePath(record.photoData, record.id, 'preview') || NO_PREVIEW_IMAGE,
+                    originalData: archiveFilePath(record.originalData, record.id, 'original'),
+                    telegramUrl: archiveTelegramUrl(record.telegramUrl),
+                    status: 'delivered', archived: true, retryable: false,
+                };
+                if (previous && previous.blob) {
+                    photos.set(record.id, { ...restored, ...previous, status: 'delivered', archived: true,
+                        telegramUrl: restored.telegramUrl, retryable: false });
+                } else photos.set(record.id, restored);
+            }
+            guestPhotos = [...photos.values()].sort((left, right) => right.timestamp - left.timestamp);
+            schedulePendingRetries();
+            renderMiniGallery(); renderSharedAlbumFromLocal();
+        }
+        window.refreshGuestArchive = function(showError = true) {
+            if (archiveRequest) return archiveRequest;
+            archiveRequest = (async () => {
+                try {
+                    if (!sessionReady) await refreshSession();
+                    const response = await fetch('/api/archive', { credentials: 'same-origin', cache: 'no-store' });
+                    if (!response.ok) throw new Error('Archive unavailable');
+                    const result = await response.json();
+                    if (!result || !Array.isArray(result.photos)) throw new Error('Invalid archive response');
+                    mergeGuestArchive(result.photos);
+                    return true;
+                } catch {
+                    if (showError) showToast('Не удалось обновить ваши фотографии. Попробуйте ещё раз; снимки текущей вкладки остаются доступны.');
+                    return false;
+                } finally { archiveRequest = null; }
+            })();
+            return archiveRequest;
+        };
         window.addEventListener('online', async () => {
             try { await refreshSession(); if (uploadsEnabled) await retryPendingPhotos(); }
             catch { engineStatus('Нет связи с сервером'); }
@@ -753,6 +809,7 @@
                     if (Number.isInteger(result.remaining)) shotsTaken = MAX_SHOTS - result.remaining;
                     updateShotsCounterUI(); engineStatus('Оригинальное качество');
                     showToast('Снимок доставлен в архив!');
+                    void refreshGuestArchive(false);
                     if (shotsTaken >= MAX_SHOTS && guestPhotos.every(p => p.status === 'delivered')) openModal('modal-finished');
                 } else {
                     const code = typeof result.code === 'string' ? result.code : 'INVALID_RESPONSE';
@@ -797,9 +854,10 @@
         function photoCard(photo, mini) {
             const card = document.createElement('div');
             card.className = mini ? 'flex-shrink-0 w-10 h-10 rounded-lg overflow-hidden border border-champagne-500/40 cursor-pointer active:scale-95 transition' : 'relative group aspect-[3/4] rounded-2xl overflow-hidden bg-stone-900 border border-stone-800 shadow-md cursor-pointer hover:border-champagne-500/50 transition';
-            card.addEventListener('click', () => openLightbox(photo.photoData, photo.guestName || 'Гость', photo.originalData, photo.originalName));
+            card.addEventListener('click', () => openLightbox(photo.photoData || NO_PREVIEW_IMAGE, photo.guestName || 'Гость', photo.originalData, photo.originalName, photo.telegramUrl));
             const img = document.createElement('img');
-            img.src = photo.photoData; img.alt = 'Guest Shot'; img.className = 'w-full h-full object-cover';
+            img.src = photo.photoData || NO_PREVIEW_IMAGE; img.alt = 'Guest Shot'; img.className = 'w-full h-full object-cover';
+            img.onerror = () => { img.onerror = null; img.src = NO_PREVIEW_IMAGE; };
             card.appendChild(img);
             if (!mini) {
                 const overlay = document.createElement('div');
@@ -944,11 +1002,30 @@
             document.getElementById('card-date').innerText = weddingSettings.date;
         }
 
-        window.openLightbox = function(imgSrc, author, originalSrc = imgSrc, originalName = 'wedding-photo.jpg') {
+        window.openLightbox = function(imgSrc, author, originalSrc = null, originalName = 'wedding-photo.jpg', telegramUrl = null) {
             document.getElementById('lightbox-img').src = imgSrc;
             document.getElementById('lightbox-author').innerText = `Фото от: ${author}`;
-            document.getElementById('lightbox-download-link').href = originalSrc;
-            document.getElementById('lightbox-download-link').download = originalName;
+            const download = document.getElementById('lightbox-download-link');
+            download.onclick = null;
+            download.target = '_self'; download.rel = '';
+            if (originalSrc) {
+                download.href = originalSrc; download.download = originalName;
+                download.title = 'Скачать оригинал';
+            } else if (archiveTelegramUrl(telegramUrl)) {
+                download.href = archiveTelegramUrl(telegramUrl);
+                download.removeAttribute?.('download');
+                download.target = '_blank'; download.rel = 'noopener noreferrer';
+                download.title = 'Открыть оригинал в Telegram';
+                showToast('Оригинал доступен в Telegram. Кнопка скачивания откроет сообщение с исходным файлом.');
+            } else {
+                download.href = '#'; download.removeAttribute?.('download');
+                download.title = 'Оригинал доступен в группе Telegram';
+                download.onclick = event => {
+                    event.preventDefault();
+                    showToast('Для этого снимка нет ссылки скачивания. Оригинал доступен в группе Telegram у организатора.');
+                };
+                showToast('Оригинал этого снимка доступен в группе Telegram у организатора.');
+            }
             openModal('modal-lightbox');
         };
 
@@ -1047,6 +1124,11 @@
                 showToast("В альбоме пока нет снимков.");
                 return;
             }
+            const photos = [...guestPhotos];
+            if (photos.some(photo => !photo.blob && !photo.originalData)) {
+                showToast('Оригиналы некоторых снимков доступны только в Telegram. Скачайте их в группе у организатора; неполный ZIP не создаётся.');
+                return;
+            }
 
             const btn = document.getElementById('btn-download-zip');
             const orig = btn.innerHTML;
@@ -1056,13 +1138,19 @@
                 const zip = new JSZip();
                 const folder = zip.folder("wedding_photos");
 
-                guestPhotos.forEach((photo, idx) => {
-                    if (photo.photoData) {
-                        const photoBlob = photo.blob;
-                        const filename = `${idx + 1}_${String(photo.originalName || 'wedding-original.jpg').replace(/[\\/\x00-\x1f\x7f]/g, '_')}`;
-                        folder.file(filename, photoBlob);
+                for (const [idx, photo] of photos.entries()) {
+                    let photoBlob = photo.blob;
+                    if (!photoBlob) {
+                        const response = await fetch(photo.originalData, { credentials: 'same-origin', cache: 'no-store' });
+                        if (!response.ok) throw new Error('Original unavailable');
+                        const contentType = response.headers.get('content-type') || '';
+                        if (/application\/json|text\/html/i.test(contentType)) throw new Error('Invalid original response');
+                        photoBlob = await response.blob();
+                        if (!photoBlob.size) throw new Error('Empty original response');
                     }
-                });
+                    const filename = `${idx + 1}_${String(photo.originalName || 'wedding-original.jpg').replace(/[\\/\u0000-\u001f\u007f]/g, '_')}`;
+                    folder.file(filename, photoBlob);
+                }
 
                 const content = await zip.generateAsync({ type: "blob" });
                 const link = document.createElement('a');
@@ -1074,7 +1162,7 @@
                 showToast("Загрузка архива началась!");
             } catch (e) {
                 console.error("ZIP Error:", e);
-                showToast("Ошибка создания архива.");
+                showToast('Не удалось получить все оригиналы для ZIP. Попробуйте ещё раз или скачайте исходные файлы в Telegram.');
             } finally {
                 btn.innerHTML = orig;
             }

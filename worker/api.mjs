@@ -185,6 +185,64 @@ function originalFilename(name, extension) {
   const base = String(name || 'original').split(/[\\/]/).at(-1).replace(/[\x00-\x1f\x7f<>:"|?*]/g, '_').replace(/^\.+/, '').slice(0, 100) || 'original';
   return /\.(jpe?g|png|webp|heic|heif|avif|tiff?|dng|gif|bmp|jxl)$/i.test(base) ? base : `${base}.${extension}`;
 }
+const telegramFileId = value => typeof value === 'string' && /^[A-Za-z0-9_-]{1,512}$/.test(value) ? value : null;
+function previewFileId(photos) {
+  if (!Array.isArray(photos)) return null;
+  const candidates = photos.filter(photo => telegramFileId(photo?.file_id));
+  candidates.sort((a, b) => Math.abs(Math.max(a.width || 0, a.height || 0) - 320) - Math.abs(Math.max(b.width || 0, b.height || 0) - 320));
+  return telegramFileId(candidates[0]?.file_id);
+}
+function messageLink(chatId, messageId) {
+  if (!Number.isSafeInteger(messageId) || messageId < 1) return null;
+  if (/^-100[0-9]+$/.test(chatId || '')) return `https://t.me/c/${chatId.slice(4)}/${messageId}`;
+  if (/^@[A-Za-z0-9_]{5,}$/.test(chatId || '')) return `https://t.me/${chatId.slice(1)}/${messageId}`;
+  return null;
+}
+function archiveMetadata(photo, env) {
+  const downloadable = photo.document_file_id && Number.isSafeInteger(photo.original_size) && photo.original_size >= 0 && photo.original_size <= 20000000;
+  return {
+    id: photo.id, guestName: photo.author_name || 'Гость', timestamp: photo.created_at,
+    originalName: photo.original_name || 'original.jpg', originalSize: photo.original_size ?? null,
+    photoData: photo.preview_file_id ? `/api/archive/${photo.id}/preview` : null,
+    originalData: downloadable ? `/api/archive/${photo.id}/original` : null,
+    telegramUrl: messageLink(env.TELEGRAM_CHAT_ID, photo.message_id),
+  };
+}
+async function archiveFile(request, env, ctx, photo, kind) {
+  const original = kind === 'original';
+  if (original && (!Number.isSafeInteger(photo.original_size) || photo.original_size > 20000000)) return failure(409, 'USE_TELEGRAM', 'Оригинал доступен в Telegram.');
+  const fileId = telegramFileId(original ? photo.document_file_id : photo.preview_file_id);
+  if (!fileId) return failure(404, 'NOT_FOUND', 'Файл недоступен.');
+  if (!env.TELEGRAM_BOT_TOKEN) return failure(503, 'ARCHIVE_UNAVAILABLE', 'Архив временно недоступен.');
+  const fetcher = ctx.fetchImpl || fetch;
+  const infoResponse = await fetcher(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/getFile`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file_id: fileId }), signal: AbortSignal.timeout(15000),
+  });
+  const info = await infoResponse.json();
+  if (info.ok !== true) return failure(502, 'ARCHIVE_UNAVAILABLE', 'Telegram временно не выдаёт файл.');
+  const path = info.result?.file_path;
+  if (typeof path !== 'string' || path.length > 512 || !/^[A-Za-z0-9_/-]+\.[A-Za-z0-9]{1,12}$/.test(path) || path.startsWith('/') || path.split('/').some(part => !part || part === '.' || part === '..')) return failure(502, 'ARCHIVE_UNAVAILABLE', 'Некорректный ответ файлового сервиса.');
+  const limit = original ? 20000000 : 2 * 1024 * 1024;
+  if (Number(info.result?.file_size) > limit) return failure(original ? 409 : 502, original ? 'USE_TELEGRAM' : 'ARCHIVE_UNAVAILABLE', original ? 'Оригинал доступен в Telegram.' : 'Предпросмотр недоступен.');
+  const download = await fetcher(`https://api.telegram.org/file/bot${env.TELEGRAM_BOT_TOKEN}/${path}`, { redirect: 'error', signal: AbortSignal.timeout(30000) });
+  if (!download.ok || !download.body) return failure(502, 'ARCHIVE_UNAVAILABLE', 'Не удалось получить файл.');
+  if (Number(download.headers.get('Content-Length')) > limit) {
+    await download.body.cancel();
+    return failure(original ? 409 : 502, original ? 'USE_TELEGRAM' : 'ARCHIVE_UNAVAILABLE', 'Файл доступен в Telegram.');
+  }
+  let size = 0;
+  const stream = download.body.pipeThrough(new TransformStream({ transform(chunk, controller) {
+    size += chunk.byteLength;
+    if (size > limit) { logFailure('archive_stream_limit', photo.id, { name: 'FileTooLarge' }); controller.error(new Error('FILE_TOO_LARGE')); return; }
+    controller.enqueue(chunk);
+  } }));
+  const name = String(photo.original_name || 'original.jpg').replace(/[\r\n\x00-\x1f\x7f]/g, '_');
+  return new Response(stream, { headers: {
+    'Content-Type': original ? 'application/octet-stream' : 'image/jpeg',
+    'Content-Disposition': original ? `attachment; filename="original"; filename*=UTF-8''${encodeURIComponent(name).replace(/['()*]/g, c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)}` : 'inline',
+    'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'Cross-Origin-Resource-Policy': 'same-origin',
+  } });
+}
 
 export async function handleApi(request, env, ctx = {}) {
   let bodySlot;
@@ -203,6 +261,22 @@ export async function handleApi(request, env, ctx = {}) {
     // A terminated isolate may leave a request in flight. Never automatically resend it.
     await db.prepare("UPDATE photos SET status='unknown' WHERE status='sending' AND created_at<?").bind(now - 300000).run();
     if (ctx.waitUntil) ctx.waitUntil(db.prepare('DELETE FROM rate_limits WHERE expires_at<?').bind(now - 86400000).run().catch(() => {}));
+    if (request.method === 'GET' && (incoming.pathname === '/api/archive' || incoming.pathname.startsWith('/api/archive/'))) {
+      stage = 'archive';
+      const sessionId = await findSession(request, db);
+      if (!sessionId) return failure(401, 'SESSION_REQUIRED', 'Для архива нужна ваша сессия гостя.');
+      if (!await rate(db, `archive:${sessionId}`, 120, 60000, now)) return failure(429, 'RATE_LIMIT', 'Слишком много запросов архива. Попробуйте позже.');
+      if (incoming.pathname === '/api/archive') {
+        const rows = await db.prepare("SELECT id,author_name,created_at,original_name,original_size,document_file_id,preview_file_id,message_id FROM photos WHERE session_id=? AND status='delivered' ORDER BY created_at DESC LIMIT 50").bind(sessionId).all();
+        return reply(200, { photos: (rows.results || []).map(photo => archiveMetadata(photo, env)) });
+      }
+      const match = /^\/api\/archive\/([^/]+)\/(preview|original)$/.exec(incoming.pathname);
+      if (!match || !PHOTO_UUID.test(match[1])) return failure(404, 'NOT_FOUND', 'Не найдено.');
+      loggedPhotoId = match[1];
+      const photo = await db.prepare("SELECT id,original_name,original_size,document_file_id,preview_file_id FROM photos WHERE id=? AND session_id=? AND status='delivered'").bind(match[1], sessionId).first();
+      if (!photo) return failure(404, 'NOT_FOUND', 'Не найдено.');
+      return await archiveFile(request, env, ctx, photo, match[2]);
+    }
     if (request.method === 'GET' && incoming.pathname === '/api/session') {
       if (!await rate(db, `session:${ip}`, 300, 60000, now)) return failure(429, 'RATE_LIMIT', 'Слишком много запросов. Попробуйте позже.');
       let sessionId = await findSession(request, db); let cookie;
@@ -296,14 +370,15 @@ export async function handleApi(request, env, ctx = {}) {
       documentName = `wedding_${photoId}.jpg`;
     }
     // SQLite serializes this entire statement: cross-isolate quotas and retry ownership are atomic.
-    const reservation = await db.prepare(`INSERT INTO photos(id,session_id,status,created_at,message_id)
-      SELECT ?,?,'sending',?,NULL WHERE
+    const reservation = await db.prepare(`INSERT INTO photos(id,session_id,status,created_at,message_id,author_name,original_name,original_type,original_size)
+      SELECT ?,?,'sending',?,NULL,?,?,?,? WHERE
         (SELECT COUNT(*) FROM photos WHERE session_id=? AND status IN ${COUNTED})<15 AND
         (SELECT COUNT(*) FROM photos WHERE status IN ${COUNTED})<? AND
         (SELECT COUNT(*) FROM photos WHERE status='sending')<?
-      ON CONFLICT(id) DO UPDATE SET status='sending',created_at=excluded.created_at,message_id=NULL
+      ON CONFLICT(id) DO UPDATE SET status='sending',created_at=excluded.created_at,message_id=NULL,
+        author_name=excluded.author_name,original_name=excluded.original_name,original_type=excluded.original_type,original_size=excluded.original_size
         WHERE photos.session_id=excluded.session_id AND photos.status='failed'
-      RETURNING id`).bind(photoId, sessionId, Date.now(), sessionId, numberSetting(env.EVENT_UPLOAD_CAP, 3000), numberSetting(env.MAX_CONCURRENT_UPLOADS, 1)).first();
+      RETURNING id`).bind(photoId, sessionId, Date.now(), author, documentName, documentBlob.type, documentBlob.size, sessionId, numberSetting(env.EVENT_UPLOAD_CAP, 3000), numberSetting(env.MAX_CONCURRENT_UPLOADS, 1)).first();
     if (!reservation) {
       const raced = await previousResult(); if (raced) return raced;
       if (!await shotsRemaining(db, sessionId)) return failure(429, 'SHOT_LIMIT', 'Лимит 15 снимков исчерпан.');
@@ -323,6 +398,7 @@ export async function handleApi(request, env, ctx = {}) {
           previewForm.append('photo', new Blob([previewBytes], { type: 'image/jpeg' }), `wedding_${photoId}.jpg`);
           previewForm.append('caption', `📸 Фото от гостя: ${author}`);
           let previewId;
+          let savedPreviewFileId = null;
           stage = 'preview_send';
           console.info('wedding_upload_stage', { stage, photoId });
           try {
@@ -333,13 +409,14 @@ export async function handleApi(request, env, ctx = {}) {
               logFailure(stage, photoId, { name: 'TelegramRejected' });
             } else if (preview.ok === true && Number.isSafeInteger(preview.result?.message_id) && preview.result.message_id > 0) {
               previewId = preview.result.message_id; previewStatus = 'sent';
+              savedPreviewFileId = previewFileId(preview.result?.photo);
             } else throw new Error('Unrecognized preview response');
           } catch (error) {
             previewId = -2; previewStatus = 'unknown'; logFailure(stage, photoId, error);
           }
           stage = 'preview_checkpoint';
           // Sentinel checkpoints also prevent repeated preview attempts after a document rejection.
-          await db.prepare("UPDATE photos SET preview_message_id=? WHERE id=? AND session_id=? AND status='sending'").bind(previewId, photoId, sessionId).run();
+          await db.prepare("UPDATE photos SET preview_message_id=?,preview_file_id=COALESCE(?,preview_file_id) WHERE id=? AND session_id=? AND status='sending'").bind(previewId, savedPreviewFileId, photoId, sessionId).run();
         }
         stage = 'document_send';
         console.info('wedding_upload_stage', { stage, photoId });
@@ -347,7 +424,9 @@ export async function handleApi(request, env, ctx = {}) {
         const telegram = await (ctx.fetchImpl || fetch)(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendDocument`, { method: 'POST', ...upload, signal: AbortSignal.timeout(Math.min(numberSetting(env.TELEGRAM_TIMEOUT_MS, 30000), 30000)) });
         const result = await telegram.json();
         if (result.ok === true) {
-          await db.prepare("UPDATE photos SET status='delivered',message_id=? WHERE id=? AND session_id=? AND status IN ('sending','unknown')").bind(result.result?.message_id ?? null, photoId, sessionId).run();
+          const deliveredFileId = telegramFileId(result.result?.document?.file_id);
+          const thumbnailFileId = telegramFileId((result.result?.document?.thumbnail || result.result?.document?.thumb)?.file_id);
+          await db.prepare("UPDATE photos SET status='delivered',message_id=?,document_file_id=COALESCE(?,document_file_id),preview_file_id=COALESCE(preview_file_id,?) WHERE id=? AND session_id=? AND status IN ('sending','unknown')").bind(result.result?.message_id ?? null, deliveredFileId, thumbnailFileId, photoId, sessionId).run();
           console.info('wedding_upload_stage', { stage: 'delivered', photoId });
           return reply(200, { ok: true, photoId, remaining: await shotsRemaining(db, sessionId), previewStatus });
         }

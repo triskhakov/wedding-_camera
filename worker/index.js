@@ -155,24 +155,27 @@ function validJpeg(bytes, maxDimension = 12000, maxPixels = 24 * 1024 * 1024) {
 }
 
 async function originalFormat(file) {
-  // Only inspect a tiny prefix/tail. Never duplicate the original camera file in an ArrayBuffer.
+  // Camera originals may append motion-video or vendor metadata after the image.
+  // Detect the format from a bounded prefix without requiring image bytes to end the file.
   const bytes = new Uint8Array(await file.slice(0, 256).arrayBuffer());
-  const tail = new Uint8Array(await file.slice(Math.max(0, file.size - 12)).arrayBuffer());
   const ascii = (start, end) => String.fromCharCode(...bytes.subarray(start, end));
-  if (bytes.length >= 4 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255 && tail.at(-2) === 255 && tail.at(-1) === 217) return { type: 'image/jpeg', extension: 'jpg' };
-  if (bytes.length >= 20 && bytes.subarray(0, 8).every((n, i) => n === [137, 80, 78, 71, 13, 10, 26, 10][i]) && String.fromCharCode(...tail.subarray(tail.length - 8, tail.length - 4)) === 'IEND') return { type: 'image/png', extension: 'png' };
+  const jpegMarker = bytes[3];
+  if (bytes.length >= 4 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255 && jpegMarker >= 192 && jpegMarker <= 254 && jpegMarker !== 200 && !(jpegMarker >= 208 && jpegMarker <= 217)) return { type: 'image/jpeg', extension: 'jpg' };
+  if (bytes.length >= 20 && bytes.subarray(0, 8).every((n, i) => n === [137, 80, 78, 71, 13, 10, 26, 10][i])) return { type: 'image/png', extension: 'png' };
   if (bytes.length >= 20 && ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP') {
     const size = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(4, true) + 8;
-    if (size === file.size) return { type: 'image/webp', extension: 'webp' };
+    if (size >= 20 && size <= file.size) return { type: 'image/webp', extension: 'webp' };
   }
+  const jxlContainer = [0, 0, 0, 12, 74, 88, 76, 32, 13, 10, 135, 10];
+  if ((bytes.length >= 4 && bytes[0] === 255 && bytes[1] === 10) || (bytes.length >= 12 && jxlContainer.every((n, i) => bytes[i] === n))) return { type: 'image/jxl', extension: 'jxl' };
   if (bytes.length >= 6 && ['GIF87a', 'GIF89a'].includes(ascii(0, 6))) return { type: 'image/gif', extension: 'gif' };
   if (bytes.length >= 14 && ascii(0, 2) === 'BM') return { type: 'image/bmp', extension: 'bmp' };
   if (bytes.length >= 8 && ((ascii(0, 2) === 'II' && bytes[2] === 42 && bytes[3] === 0) || (ascii(0, 2) === 'MM' && bytes[2] === 0 && bytes[3] === 42))) return { type: 'image/tiff', extension: 'tiff' };
   if (bytes.length >= 16 && ascii(4, 8) === 'ftyp') {
     const size = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(0);
-    if (size < 16 || size > file.size || size > 256) return null;
+    if (size < 16 || size > file.size) return null;
     const brands = [ascii(8, 12)];
-    for (let offset = 16; offset + 4 <= size; offset += 4) brands.push(ascii(offset, offset + 4));
+    for (let offset = 16; offset + 4 <= Math.min(size, bytes.length); offset += 4) brands.push(ascii(offset, offset + 4));
     if (brands.some(brand => ['avif', 'avis'].includes(brand))) return { type: 'image/avif', extension: 'avif' };
     if (brands.some(brand => ['heic', 'heix', 'hevc', 'hevx'].includes(brand))) return { type: 'image/heic', extension: 'heic' };
     if (brands.some(brand => ['mif1', 'msf1', 'heif'].includes(brand))) return { type: 'image/heif', extension: 'heif' };
@@ -181,7 +184,7 @@ async function originalFormat(file) {
 }
 function originalFilename(name, extension) {
   const base = String(name || 'original').split(/[\\/]/).at(-1).replace(/[\x00-\x1f\x7f<>:"|?*]/g, '_').replace(/^\.+/, '').slice(0, 100) || 'original';
-  return /\.(jpe?g|png|webp|heic|heif|avif|tiff?|dng|gif|bmp)$/i.test(base) ? base : `${base}.${extension}`;
+  return /\.(jpe?g|png|webp|heic|heif|avif|tiff?|dng|gif|bmp|jxl)$/i.test(base) ? base : `${base}.${extension}`;
 }
 
 async function handleApi(request, env, ctx = {}) {

@@ -304,3 +304,53 @@ test('diagnostics exclude Telegram credentials, guest names and raw error detail
   assert.doesNotMatch(diagnostics, /test-token|PrivateGuest|test-chat|api\.telegram\.org/);
   assert.doesNotMatch(await res.text(), /test-token|PrivateGuest|test-chat|api\.telegram\.org/);
 });
+
+for (const [kind, trailer] of [
+  ['motion-photo MP4', Buffer.concat([Buffer.from('000000186674797069736f6d0000000069736f6d6d703432', 'hex'), Buffer.from('original motion video bytes')])],
+  ['camera padding', Buffer.from([0, 0, 0, 0, 32, 10])],
+]) {
+  test(`JPEG original with appended ${kind} preserves the entire original file`, async t => {
+    const original = Buffer.concat([jpeg, trailer]);
+    const sent = [];
+    const app = fixture(t, { telegram: async (url, options) => {
+      const method = url.split('/').at(-1); sent.push(method);
+      const fields = await telegramForm(options);
+      const file = fields.get(method === 'sendPhoto' ? 'photo' : 'document');
+      assert.deepEqual(Buffer.from(await file.arrayBuffer()), method === 'sendPhoto' ? jpeg : original);
+      return { json: async () => ({ ok: true, result: { message_id: sent.length } }) };
+    } });
+    const { cookie } = await app.session();
+    const res = await originalUpload(app, cookie, { original, preview: jpeg, name: 'camera-original.jpg' });
+    assert.equal(res.status, 200);
+    assert.deepEqual(sent, ['sendPhoto', 'sendDocument']);
+  });
+}
+
+test('HTML and SVG originals remain rejected despite a JPEG filename and MIME', async t => {
+  const app = fixture(t); const { cookie } = await app.session();
+  for (const text of ['<!doctype html><html><script>alert(1)</script></html>', '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>']) {
+    const body = new FormData();
+    body.append('preview', new Blob([jpeg], { type: 'image/jpeg' }), 'preview.jpg');
+    body.append('document', new Blob([text], { type: 'image/jpeg' }), 'fake.jpg');
+    const res = await app.request('/api/photos', { method: 'POST', cookie, body, headers: { 'X-Photo-Id': randomUUID() } });
+    assert.equal(res.status, 415);
+  }
+  assert.equal(app.calls(), 0);
+});
+
+test('WebP original with vendor trailer preserves all container and trailer bytes', async t => {
+  const webp = Buffer.from('UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA', 'base64');
+  const original = Buffer.concat([webp, Buffer.from('vendor metadata after RIFF container')]);
+  const app = fixture(t, { telegram: async (url, options) => {
+    const fields = await telegramForm(options);
+    if (url.endsWith('/sendDocument')) {
+      const file = fields.get('document');
+      assert.deepEqual(Buffer.from(await file.arrayBuffer()), original);
+      assert.equal(file.type, 'image/webp');
+    }
+    return { json: async () => ({ ok: true, result: { message_id: 1 } }) };
+  } });
+  const { cookie } = await app.session();
+  const res = await originalUpload(app, cookie, { original, preview: jpeg, name: 'camera.webp' });
+  assert.equal(res.status, 200); assert.equal(app.calls(), 2);
+});

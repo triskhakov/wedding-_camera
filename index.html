@@ -448,98 +448,121 @@
 
     <!-- JAVASCRIPT APPLICATION LOGIC -->
     <script>
-        // Конфигурация Автоматического Сохранения в Облако Telegram
-        const CLOUD_CONFIG = {
-            telegramBotToken: "8835401978:AAHwSnxzW140WDkotcZkEW4umHsFB7viPZ0", 
-            telegramChatId: "-1004225514927"     
-        };
-
-        // App State Variables
-        const MAX_SHOTS = 15;
-        let guestId = localStorage.getItem('wedding_guest_id') || ('guest_' + Math.random().toString(36).substring(2, 9));
-        localStorage.setItem('wedding_guest_id', guestId);
-
-        let guestName = localStorage.getItem('wedding_guest_name') || '';
-        let shotsTaken = parseInt(localStorage.getItem(`wedding_shots_${guestId}`) || '0', 10);
-        let guestPhotos = JSON.parse(localStorage.getItem(`wedding_local_photos_${guestId}`) || '[]');
-
+        // Credentials and upload limits are enforced by the same-origin server.
+        let MAX_SHOTS = 15;
+        const MAX_FILE_BYTES = 10 * 1024 * 1024;
+        const MAX_IMAGE_PIXELS = 24 * 1000 * 1000;
+        function readSetting(key, fallback = '') {
+            try { return localStorage.getItem(key) || fallback; } catch { return fallback; }
+        }
+        function writeSetting(key, value) {
+            try { localStorage.setItem(key, value); return true; }
+            catch { showToast('Не удалось сохранить настройки на устройстве.'); return false; }
+        }
+        let guestId = readSetting('wedding_guest_id') || crypto.randomUUID();
+        writeSetting('wedding_guest_id', guestId);
+        let guestName = readSetting('wedding_guest_name');
+        let shotsTaken = 0;
+        let guestPhotos = [];
+        let uploadsEnabled = false;
+        let sessionReady = false;
+        let captureBusy = false;
+        const uploadingIds = new Set();
         let weddingSettings = {
-            names: localStorage.getItem('wedding_cfg_names') || "Anvar & Ugiljon",
-            date: localStorage.getItem('wedding_cfg_date') || "09.11.2026",
-            siteUrl: localStorage.getItem('wedding_cfg_url') || window.location.href
+            names: readSetting('wedding_cfg_names', 'Anvar & Ugiljon'),
+            date: readSetting('wedding_cfg_date', '09.11.2026'),
+            siteUrl: readSetting('wedding_cfg_url', window.location.href)
         };
 
-        window.addEventListener('DOMContentLoaded', () => {
+        function engineStatus(message) {
+            document.getElementById('engine-status-text').textContent = message;
+        }
+        async function refreshSession() {
+            const response = await fetch('/api/session', { credentials: 'same-origin', cache: 'no-store' });
+            if (!response.ok) throw new Error('Сервер недоступен');
+            const data = await response.json();
+            if (!Number.isInteger(data.maxShots) || !Number.isInteger(data.remaining)) throw new Error('Неверный ответ сервера');
+            MAX_SHOTS = data.maxShots;
+            shotsTaken = Math.max(0, MAX_SHOTS - data.remaining);
+            uploadsEnabled = data.uploadsEnabled === true;
+            sessionReady = true;
+            updateShotsCounterUI();
+        }
+        window.addEventListener('DOMContentLoaded', async () => {
             updateShotsCounterUI();
             updateGuestNameUI();
             applyWeddingSettingsUI();
             renderMiniGallery();
             renderSharedAlbumFromLocal();
-
-            if (!localStorage.getItem('wedding_guest_name')) {
-                setTimeout(() => {
-                    openModal('modal-name');
-                }, 300);
+            if (!guestName) setTimeout(() => openModal('modal-name'), 300);
+            try {
+                await refreshSession();
+                engineStatus(uploadsEnabled ? 'Оригинальное качество' : 'Загрузка недоступна');
+                if (uploadsEnabled) await retryPendingPhotos();
+                if (guestPhotos.some(p => p.status === 'unknown')) engineStatus('Проверьте доставку в архив');
+            } catch {
+                engineStatus('Нет связи с сервером');
+                showToast('Не удалось подключиться к серверу. Проверьте соединение.');
             }
         });
+        window.addEventListener('online', async () => {
+            try { await refreshSession(); if (uploadsEnabled) await retryPendingPhotos(); }
+            catch { engineStatus('Нет связи с сервером'); }
+        });
 
-        // ПИН-КОД АВТОРИЗАЦИИ ОРГАНИЗАТОРОВ
-        window.authenticateAdmin = function() {
-            const pin = document.getElementById('admin-pin-input').value.trim();
-            const validPins = ["2026", "7788", "1234"];
-
-            if (validPins.includes(pin)) {
+        window.authenticateAdmin = async function() {
+            const input = document.getElementById('admin-pin-input');
+            try {
+                const response = await fetch('/api/admin/session', {
+                    method: 'POST', credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: input.value.trim() })
+                });
+                const result = await response.json();
+                input.value = '';
+                if (!response.ok || result.ok !== true) { showToast('Неверный ПИН-код или доступ недоступен.'); return; }
                 document.getElementById('admin-auth-container').classList.add('hidden');
                 document.getElementById('admin-dashboard-content').classList.remove('hidden');
                 document.getElementById('admin-dashboard-content').classList.add('flex');
-                showToast("Доступ разрешен!");
-            } else {
-                showToast("Неверный ПИН-код!");
-            }
+                showToast('Доступ разрешен!');
+            } catch { showToast('Не удалось проверить ПИН-код.'); }
         };
-
-        // Main Shutter Trigger
         window.triggerShutter = function() {
-            if (shotsTaken >= MAX_SHOTS) {
-                openModal('modal-finished');
+            if (captureBusy) return;
+            if (!sessionReady || !uploadsEnabled) {
+                showToast('Загрузка сейчас недоступна. Проверьте подключение и перезагрузите страницу.'); return;
+            }
+            if (shotsTaken + guestPhotos.filter(p => p.status === 'pending' || p.status === 'uploading').length >= MAX_SHOTS) {
+                if (guestPhotos.every(p => p.status === 'delivered')) openModal('modal-finished');
+                else showToast('Лимит снимков исчерпан. Проверьте доставку фото.');
                 return;
             }
             document.getElementById('native-camera-input').click();
         };
-
-        window.handleNativeCameraCapture = function(event) {
+        window.handleNativeCameraCapture = async function(event) {
             const file = event.target.files && event.target.files[0];
-            if (!file) return;
-
-            playShutterSound();
-            triggerFlash();
-
-            const img = new Image();
+            if (!file || captureBusy) return;
+            if (!file.type.startsWith('image/') || file.size > MAX_FILE_BYTES) {
+                showToast('Выберите изображение размером до 10 МБ.'); event.target.value = ''; return;
+            }
+            captureBusy = true;
             const url = URL.createObjectURL(file);
-
-            img.onload = () => {
+            const img = new Image();
+            try {
+                await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = url; });
+                const w = img.naturalWidth, h = img.naturalHeight;
+                if (!w || !h || w * h > MAX_IMAGE_PIXELS || w > 12000 || h > 12000) throw new Error('Слишком большое изображение. Максимум 24 мегапикселя.');
                 const canvas = document.getElementById('hidden-canvas');
+                canvas.width = w; canvas.height = h;
                 const ctx = canvas.getContext('2d');
-                
-                // Берем 100% оригинальные размеры фото камеры без каких-либо ограничений
-                const w = img.width;
-                const h = img.height;
-
-                canvas.width = w;
-                canvas.height = h;
-
-                // Отрисовка без сжатия
                 ctx.drawImage(img, 0, 0, w, h);
                 applyCanvasWeddingOverlay(ctx, w, h);
-
-                // Максимальное качество JPEG (0.98) для сохранения детализации исходника
-                const photoDataUrl = canvas.toDataURL('image/jpeg', 0.98);
-                URL.revokeObjectURL(url);
-
-                savePhotoEntry(photoDataUrl);
-                event.target.value = '';
-            };
-            img.src = url;
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.98));
+                canvas.width = canvas.height = 0;
+                if (!blob || blob.size > MAX_FILE_BYTES) throw new Error('Снимок превышает 10 МБ. Выберите меньшее разрешение камеры.');
+                playShutterSound(); triggerFlash();
+                await savePhotoEntry(blob);
+            } catch (error) { showToast(error instanceof Error ? error.message : 'Не удалось обработать изображение.'); }
+            finally { URL.revokeObjectURL(url); event.target.value = ''; captureBusy = false; }
         };
 
         function applyCanvasWeddingOverlay(ctx, w, h) {
@@ -567,127 +590,93 @@
             ctx.fillText(`${weddingSettings.date} • Фото: ${displayAuthor}`, w / 2, h - (ribbonHeight * 0.20));
         }
 
-        function savePhotoEntry(photoDataUrl) {
-            shotsTaken++;
-            localStorage.setItem(`wedding_shots_${guestId}`, shotsTaken.toString());
-            
-            const currentAuthor = guestName || 'Гость';
-            const newPhotoObj = {
-                id: Date.now().toString(),
-                photoData: photoDataUrl,
-                timestamp: Date.now(),
-                guestId: guestId,
-                guestName: currentAuthor,
-                photoNumber: shotsTaken
-            };
-
-            guestPhotos.unshift(newPhotoObj);
-            try {
-                localStorage.setItem(`wedding_local_photos_${guestId}`, JSON.stringify(guestPhotos));
-            } catch (e) {
-                console.warn("Storage quota limit reached:", e);
-            }
-
-            updateShotsCounterUI();
-            renderMiniGallery();
-            renderSharedAlbumFromLocal();
-
-            // Автоматическая загрузка оригиналов в Telegram-облако
-            uploadToCloud(photoDataUrl, currentAuthor);
-
-            if (shotsTaken >= MAX_SHOTS) {
-                setTimeout(() => openModal('modal-finished'), 400);
-            } else {
-                showToast(`Снимок ${shotsTaken} из ${MAX_SHOTS} сохранен!`);
+        async function savePhotoEntry(blob) {
+            const photo = { id: crypto.randomUUID(), guestId, guestName: guestName || 'Гость', timestamp: Date.now(), blob, status: 'pending' };
+            photo.photoData = URL.createObjectURL(blob);
+            guestPhotos.unshift(photo);
+            renderMiniGallery(); renderSharedAlbumFromLocal();
+            await uploadToCloud(photo);
+        }
+        async function retryPendingPhotos() {
+            for (const photo of guestPhotos) {
+                if (photo.status === 'pending' || photo.status === 'uploading') await uploadToCloud(photo);
             }
         }
-
-        async function uploadToCloud(base64Image, authorName) {
-            if (!CLOUD_CONFIG.telegramBotToken || !CLOUD_CONFIG.telegramChatId) {
-                return;
-            }
-
+        async function uploadToCloud(photo) {
+            if (!uploadsEnabled || uploadingIds.has(photo.id) || photo.status === 'unknown' || photo.status === 'delivered' || photo.status === 'rejected') return;
+            uploadingIds.add(photo.id);
+            engineStatus('Отправляется…');
             try {
-                const response = await fetch(base64Image);
-                const blob = await response.blob();
-                const fileName = `wedding_${Date.now()}.jpg`;
-                const captionText = `📸 Фото от гостя: ${authorName}\n❤️ ${weddingSettings.names}`;
-
-                // 1. Форма для отправки фото с предпросмотром
-                const photoFormData = new FormData();
-                photoFormData.append("chat_id", CLOUD_CONFIG.telegramChatId);
-                photoFormData.append("photo", blob, fileName);
-                photoFormData.append("caption", captionText);
-
-                // 2. Форма для отправки оригинала документом (без сжатия)
-                const docFormData = new FormData();
-                docFormData.append("chat_id", CLOUD_CONFIG.telegramChatId);
-                docFormData.append("document", blob, fileName);
-                docFormData.append("caption", "📎 Оригинал снимка");
-
-                Promise.all([
-                    fetch(`https://api.telegram.org/bot${CLOUD_CONFIG.telegramBotToken}/sendPhoto`, {
-                        method: "POST",
-                        body: photoFormData
-                    }),
-                    fetch(`https://api.telegram.org/bot${CLOUD_CONFIG.telegramBotToken}/sendDocument`, {
-                        method: "POST",
-                        body: docFormData
-                    })
-                ]).then(async ([photoRes, docRes]) => {
-                    const photoData = await photoRes.json();
-                    const docData = await docRes.json();
-
-                    if (photoData.ok && docData.ok) {
-                        console.log("Фотографии отправлены в Telegram!");
-                    } else {
-                        console.error("Ошибка Telegram API:", photoData, docData);
-                    }
-                }).catch(err => console.error("Ошибка сети при отправке в облако:", err));
-
-            } catch (e) {
-                console.error("Ошибка подготовки файла для Telegram:", e);
-            }
+                photo.status = 'uploading';
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 45000);
+                let response, result;
+                try {
+                    response = await fetch('/api/photos', {
+                    method: 'POST', credentials: 'same-origin',
+                    headers: { 'Content-Type': 'image/jpeg', 'X-Photo-Id': photo.id, 'X-Guest-Name': encodeURIComponent(photo.guestName) },
+                    body: photo.blob, signal: controller.signal
+                    });
+                    result = await response.json();
+                } finally { clearTimeout(timeout); }
+                if (response.ok && result.ok === true && result.photoId === photo.id) {
+                    photo.status = 'delivered';
+                    if (Number.isInteger(result.remaining)) shotsTaken = MAX_SHOTS - result.remaining;
+                    updateShotsCounterUI();
+                    engineStatus('Оригинальное качество');
+                    showToast('Снимок доставлен в архив!');
+                    if (shotsTaken >= MAX_SHOTS && guestPhotos.every(p => p.status === 'delivered')) openModal('modal-finished');
+                } else {
+                    photo.status = result.code === 'UNKNOWN_DELIVERY' ? 'unknown' : ['FILE_TOO_LARGE', 'INVALID_IMAGE', 'INVALID_GUEST_NAME'].includes(result.code) ? 'rejected' : 'pending';
+                    engineStatus(photo.status === 'unknown' ? 'Проверьте доставку в архив' : photo.status === 'rejected' ? 'Фото не отправлено' : 'Фото ожидает отправки');
+                    showToast(photo.status === 'unknown' ? 'Результат отправки неизвестен. Организатору нужно проверить Telegram; автоматического повтора не будет.' : photo.status === 'rejected' ? 'Сервер отклонил снимок. Сделайте новый снимок меньшего размера.' : 'Фото ожидает отправки в этой вкладке. При восстановлении связи повторим отправку. Не закрывайте страницу.');
+                    try { await refreshSession(); } catch {}
+                }
+            } catch {
+                if (photo.status !== 'delivered' && photo.status !== 'unknown' && photo.status !== 'rejected') photo.status = 'pending';
+                engineStatus('Фото ожидает отправки');
+                showToast('Нет подтверждения доставки. Фото остаётся только в этой вкладке. Не закрывайте страницу до отправки.');
+            } finally { uploadingIds.delete(photo.id); }
         }
-
+        function photoCard(photo, mini) {
+            const card = document.createElement('div');
+            card.className = mini ? 'flex-shrink-0 w-10 h-10 rounded-lg overflow-hidden border border-champagne-500/40 cursor-pointer active:scale-95 transition' : 'relative group aspect-[3/4] rounded-2xl overflow-hidden bg-stone-900 border border-stone-800 shadow-md cursor-pointer hover:border-champagne-500/50 transition';
+            card.addEventListener('click', () => openLightbox(photo.photoData, photo.guestName || 'Гость'));
+            const img = document.createElement('img');
+            img.src = photo.photoData; img.alt = 'Guest Shot'; img.className = 'w-full h-full object-cover';
+            card.appendChild(img);
+            if (!mini) {
+                const overlay = document.createElement('div');
+                overlay.className = 'absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-90 flex flex-col justify-end p-2.5';
+                const name = document.createElement('span');
+                name.className = 'text-[11px] font-medium text-champagne-200 truncate';
+                const icon = document.createElement('i');
+                icon.className = 'fa-solid fa-user-tag text-[9px] mr-1 text-champagne-400';
+                name.append(icon, document.createTextNode(photo.guestName || 'Гость'));
+                const time = document.createElement('span'); time.className = 'text-[9px] text-stone-400';
+                time.textContent = new Date(photo.timestamp || Date.now()).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+                overlay.append(name, time); card.appendChild(overlay);
+            }
+            return card;
+        }
         function renderSharedAlbumFromLocal() {
             const grid = document.getElementById('shared-album-grid');
-            if (!guestPhotos || guestPhotos.length === 0) {
-                grid.innerHTML = `
-                    <div class="col-span-2 py-16 text-center text-stone-500 glass-panel rounded-2xl">
-                        <i class="fa-solid fa-camera-retro text-3xl mb-2 text-stone-600"></i>
-                        <p class="text-xs">В альбоме пока нет снимков.<br>Сделайте ваш первый кадр!</p>
-                    </div>
-                `;
-                return;
-            }
-
-            grid.innerHTML = guestPhotos.map(p => `
-                <div onclick="openLightbox('${p.photoData.replace(/'/g, "\\'")}', '${(p.guestName || 'Гость').replace(/'/g, "\\'")}')" class="relative group aspect-[3/4] rounded-2xl overflow-hidden bg-stone-900 border border-stone-800 shadow-md cursor-pointer hover:border-champagne-500/50 transition">
-                    <img src="${p.photoData}" alt="Guest Shot" class="w-full h-full object-cover">
-                    <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-90 flex flex-col justify-end p-2.5">
-                        <span class="text-[11px] font-medium text-champagne-200 truncate"><i class="fa-solid fa-user-tag text-[9px] mr-1 text-champagne-400"></i>${escapeHtml(p.guestName || 'Гость')}</span>
-                        <span class="text-[9px] text-stone-400">${new Date(p.timestamp || Date.now()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                    </div>
-                </div>
-            `).join('');
-
-            document.getElementById('stat-total-photos').innerText = guestPhotos.length;
-            document.getElementById('stat-total-guests').innerText = "1";
+            grid.replaceChildren();
+            if (guestPhotos.length === 0) {
+                // Static markup only; guest-controlled values never enter HTML.
+                grid.innerHTML = '<div class="col-span-2 py-16 text-center text-stone-500 glass-panel rounded-2xl"><i class="fa-solid fa-camera-retro text-3xl mb-2 text-stone-600"></i><p class="text-xs">В альбоме пока нет снимков.<br>Сделайте ваш первый кадр!</p></div>';
+            } else for (const photo of guestPhotos) grid.appendChild(photoCard(photo, false));
+            document.getElementById('stat-total-photos').textContent = guestPhotos.length;
+            document.getElementById('stat-total-guests').textContent = new Set(guestPhotos.map(p => p.guestId)).size;
         }
-
         function renderMiniGallery() {
             const gallery = document.getElementById('mini-gallery');
-            if (guestPhotos.length === 0) {
-                gallery.innerHTML = `<div class="text-[11px] text-stone-500 italic py-1 text-center w-full">Сделайте ваш первый кадр!</div>`;
-                return;
-            }
-
-            gallery.innerHTML = guestPhotos.map(p => `
-                <div onclick="openLightbox('${p.photoData}', '${guestName || 'Гость'}')" class="flex-shrink-0 w-10 h-10 rounded-lg overflow-hidden border border-champagne-500/40 cursor-pointer active:scale-95 transition">
-                    <img src="${p.photoData}" class="w-full h-full object-cover">
-                </div>
-            `).join('');
+            gallery.replaceChildren();
+            if (!guestPhotos.length) {
+                const empty = document.createElement('div');
+                empty.className = 'text-[11px] text-stone-500 italic py-1 text-center w-full';
+                empty.textContent = 'Сделайте ваш первый кадр!'; gallery.appendChild(empty);
+            } else for (const photo of guestPhotos) gallery.appendChild(photoCard(photo, true));
         }
 
         function playShutterSound() {
@@ -820,9 +809,12 @@
 
         window.saveGuestName = function() {
             const val = document.getElementById('input-guest-name').value.trim();
+            if (val.length > 100 || /[\u0000-\u001f\u007f]/.test(val)) {
+                showToast('Имя должно содержать до 100 символов без управляющих знаков.'); return;
+            }
             if (val) {
                 guestName = val;
-                localStorage.setItem('wedding_guest_name', guestName);
+                writeSetting('wedding_guest_name', guestName);
                 updateGuestNameUI();
                 showToast(`Имя сохранено: ${guestName}`);
             }
@@ -876,8 +868,8 @@
             if (names) weddingSettings.names = names;
             if (date) weddingSettings.date = date;
 
-            localStorage.setItem('wedding_cfg_names', weddingSettings.names);
-            localStorage.setItem('wedding_cfg_date', weddingSettings.date);
+            writeSetting('wedding_cfg_names', weddingSettings.names);
+            writeSetting('wedding_cfg_date', weddingSettings.date);
 
             applyWeddingSettingsUI();
             showToast("Настройки сохранены!");
@@ -887,7 +879,7 @@
             const urlVal = document.getElementById('cfg-site-url').value.trim();
             if (urlVal) {
                 weddingSettings.siteUrl = urlVal;
-                localStorage.setItem('wedding_cfg_url', urlVal);
+                writeSetting('wedding_cfg_url', urlVal);
                 renderHighContrastQR();
                 showToast("Ссылка для QR-кода обновлена!");
             }
@@ -909,17 +901,19 @@
 
                 guestPhotos.forEach((photo, idx) => {
                     if (photo.photoData) {
-                        const base64Data = photo.photoData.replace(/^data:image\/(png|jpeg|jpg);base64,/, "");
-                        const filename = `wedding_${photo.guestName || 'guest'}_${idx + 1}.jpg`;
-                        folder.file(filename, base64Data, { base64: true });
+                        const photoBlob = photo.blob;
+                        const filename = `wedding_${String(photo.guestName || 'guest').replace(/[^a-zA-Z0-9а-яА-ЯёЁ_-]/g, '_').slice(0, 60)}_${idx + 1}.jpg`;
+                        folder.file(filename, photoBlob);
                     }
                 });
 
                 const content = await zip.generateAsync({ type: "blob" });
                 const link = document.createElement('a');
-                link.href = URL.createObjectURL(content);
+                const archiveUrl = URL.createObjectURL(content);
+                link.href = archiveUrl;
                 link.download = `Wedding_Archive_${weddingSettings.names.replace(/\s+/g, '_')}.zip`;
                 link.click();
+                setTimeout(() => URL.revokeObjectURL(archiveUrl), 60000);
                 showToast("Загрузка архива началась!");
             } catch (e) {
                 console.error("ZIP Error:", e);

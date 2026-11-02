@@ -1,6 +1,6 @@
+dist/
+site.tar.gz
 .env
 .env.*
-!.env.example
-data/
-node_modules/
-*.log
+.sites-runtime/
+outputs/

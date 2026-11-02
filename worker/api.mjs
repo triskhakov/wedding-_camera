@@ -321,7 +321,7 @@ export async function handleApi(request, env, ctx = {}) {
           const previewForm = new FormData();
           previewForm.append('chat_id', env.TELEGRAM_CHAT_ID);
           previewForm.append('photo', new Blob([previewBytes], { type: 'image/jpeg' }), `wedding_${photoId}.jpg`);
-          previewForm.append('caption', `📸 Фото от гостя: ${author}\nID: ${photoId}`);
+          previewForm.append('caption', `📸 Фото от гостя: ${author}`);
           let previewId;
           stage = 'preview_send';
           console.info('wedding_upload_stage', { stage, photoId });
@@ -343,7 +343,7 @@ export async function handleApi(request, env, ctx = {}) {
         }
         stage = 'document_send';
         console.info('wedding_upload_stage', { stage, photoId });
-        const upload = documentRequest(env.TELEGRAM_CHAT_ID, documentBlob, documentName, `📎 Оригинал снимка\nФото от гостя: ${author}\nID: ${photoId}`);
+        const upload = documentRequest(env.TELEGRAM_CHAT_ID, documentBlob, documentName, `📎 Оригинал снимка\nФото от гостя: ${author}`);
         const telegram = await (ctx.fetchImpl || fetch)(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendDocument`, { method: 'POST', ...upload, signal: AbortSignal.timeout(Math.min(numberSetting(env.TELEGRAM_TIMEOUT_MS, 30000), 30000)) });
         const result = await telegram.json();
         if (result.ok === true) {

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { handleApi } from '../worker/api.mjs';
 
@@ -31,7 +31,9 @@ class D1Adapter {
 
 function fixture(t, { env = {}, telegram } = {}) {
   const sqlite = new DatabaseSync(':memory:');
-  sqlite.exec(readFileSync(new URL('../drizzle/0000_upload_metadata.sql', import.meta.url), 'utf8'));
+  for (const filename of readdirSync(new URL('../drizzle/', import.meta.url)).filter(name => name.endsWith('.sql')).sort()) {
+    sqlite.exec(readFileSync(new URL(`../drizzle/${filename}`, import.meta.url), 'utf8'));
+  }
   t.after(() => sqlite.close());
   let calls = 0;
   const settings = { DB: new D1Adapter(sqlite), PUBLIC_ORIGIN: origin, TELEGRAM_BOT_TOKEN: 'test-token', TELEGRAM_CHAT_ID: 'test-chat', ADMIN_PIN: 'secret-pin', MAX_UPLOAD_BYTES: '1024', ...env };
@@ -82,25 +84,25 @@ test('delivered ID retries across contexts do not send twice or cross sessions',
   const app = fixture(t); const { cookie } = await app.session(); const id = randomUUID();
   assert.equal((await app.upload(cookie, { id })).status, 200);
   const retry = await app.upload(cookie, { id }); assert.equal(retry.status, 200);
-  assert.equal((await retry.json()).remaining, 14); assert.equal(app.calls(), 1);
+  assert.equal((await retry.json()).remaining, 14); assert.equal(app.calls(), 2);
   const other = await app.session(); assert.equal((await app.upload(other.cookie, { id })).status, 409);
 });
 
 test('atomic SQL reservation enforces 15 shots across concurrent contexts', async t => {
   const app = fixture(t, { env: { MAX_CONCURRENT_UPLOADS: '20' }, telegram: async () => {
-    await new Promise(resolve => setTimeout(resolve, 10)); return { json: async () => ({ ok: true }) };
+    await new Promise(resolve => setTimeout(resolve, 10)); return { json: async () => ({ ok: true, result: { message_id: 1 } }) };
   } });
   const { cookie } = await app.session();
   const responses = await Promise.all(Array.from({ length: 16 }, () => app.upload(cookie)));
   assert.equal(responses.filter(r => r.status === 200).length, 15);
-  assert.equal(responses.filter(r => r.status === 429).length, 1); assert.equal(app.calls(), 15);
+  assert.equal(responses.filter(r => r.status === 429).length, 1); assert.equal(app.calls(), 30);
 });
 
 test('known Telegram rejection permits retry, unknown result forbids resend', async t => {
   let mode = 'reject';
   const app = fixture(t, { telegram: async () => {
     if (mode === 'unknown') throw new Error('connection lost');
-    return { json: async () => ({ ok: mode === 'success' }) };
+    return { json: async () => ({ ok: mode === 'success', result: { message_id: 1 } }) };
   } });
   const { cookie } = await app.session(); const id = randomUUID();
   assert.equal((await app.upload(cookie, { id })).status, 502);
@@ -108,34 +110,34 @@ test('known Telegram rejection permits retry, unknown result forbids resend', as
   mode = 'unknown'; const ambiguous = randomUUID();
   assert.equal((await app.upload(cookie, { id: ambiguous })).status, 409);
   const retry = await app.upload(cookie, { id: ambiguous });
-  assert.equal((await retry.json()).code, 'UNKNOWN_DELIVERY'); assert.equal(app.calls(), 3);
+  assert.equal((await retry.json()).code, 'UNKNOWN_DELIVERY'); assert.equal(app.calls(), 4);
 });
 
 test('event quota is shared by different guest sessions', async t => {
-  const app = fixture(t, { env: { EVENT_UPLOAD_CAP: '1' } });
+  const app = fixture(t, { env: { EVENT_UPLOAD_CAP: '1', MAX_CONCURRENT_UPLOADS: '20' } });
   const first = await app.session(); const second = await app.session();
   const responses = await Promise.all([app.upload(first.cookie), app.upload(second.cookie)]);
   assert.equal(responses.filter(r => r.status === 200).length, 1);
   const rejected = responses.find(r => r.status === 429);
   assert.ok(rejected); assert.equal((await rejected.json()).code, 'EVENT_LIMIT');
-  assert.equal(app.calls(), 1);
+  assert.equal(app.calls(), 2);
 });
 
 test('concurrent duplicate photo ID has a single Telegram owner', async t => {
-  const app = fixture(t, { telegram: async () => {
-    await new Promise(resolve => setTimeout(resolve, 10)); return { json: async () => ({ ok: true }) };
+  const app = fixture(t, { env: { MAX_CONCURRENT_UPLOADS: '20' }, telegram: async () => {
+    await new Promise(resolve => setTimeout(resolve, 10)); return { json: async () => ({ ok: true, result: { message_id: 1 } }) };
   } });
   const { cookie } = await app.session(); const id = randomUUID();
   const responses = await Promise.all([app.upload(cookie, { id }), app.upload(cookie, { id })]);
   assert.equal(responses.filter(r => r.status === 200).length, 1);
   assert.equal(responses.filter(r => r.status === 409).length, 1);
-  assert.equal(app.calls(), 1);
+  assert.equal(app.calls(), 2);
 });
 
 test('abandoned sending reservation becomes unknown without a new Telegram attempt', async t => {
   const app = fixture(t); const { cookie } = await app.session(); const id = randomUUID();
   const sessionId = app.sqlite.prepare('SELECT id FROM sessions').get().id;
-  app.sqlite.prepare("INSERT INTO photos(id,session_id,status,created_at) VALUES (?,?,'sending',?)").run(id, sessionId, Date.now() - 100000);
+  app.sqlite.prepare("INSERT INTO photos(id,session_id,status,created_at) VALUES (?,?,'sending',?)").run(id, sessionId, Date.now() - 200000);
   const retry = await app.upload(cookie, { id }); assert.equal(retry.status, 409);
   assert.equal((await retry.json()).code, 'UNKNOWN_DELIVERY'); assert.equal(app.calls(), 0);
 });
@@ -146,4 +148,60 @@ test('admin authentication rejects incorrect PIN and records only server-side ex
   assert.equal((await login('wrong')).status, 401); assert.equal((await login('secret-pin')).status, 200);
   assert.equal(app.sqlite.prepare("SELECT count(*) n FROM rate_limits WHERE key LIKE 'admin-session:%' AND expires_at>?").get(Date.now()).n, 1);
   app.settings.ADMIN_PIN = ''; assert.equal((await login('')).status, 503);
+});
+
+test('multipart sends preview first and preserves every original document byte', async t => {
+  const sent = [];
+  const app = fixture(t, { telegram: async (url, options) => {
+    const method = url.split('/').at(-1);
+    const file = options.body.get(method === 'sendPhoto' ? 'photo' : 'document');
+    sent.push({ method, name: file.name, bytes: Buffer.from(await file.arrayBuffer()) });
+    return { json: async () => ({ ok: true, result: { message_id: sent.length } }) };
+  } });
+  const { cookie } = await app.session(); const id = randomUUID();
+  // APP1 data stands for original metadata that must not be stripped/re-encoded.
+  const original = Buffer.concat([jpeg.subarray(0, 2), Buffer.from([255, 225, 0, 8, 69, 88, 73, 70, 0, 0]), jpeg.subarray(2)]);
+  const body = new FormData();
+  body.append('preview', new Blob([jpeg], { type: 'image/jpeg' }), 'preview.jpg');
+  body.append('document', new Blob([original], { type: 'image/jpeg' }), 'original-camera.jpg');
+  const res = await app.request('/api/photos', { method: 'POST', cookie, body, headers: { 'X-Photo-Id': id, 'X-Guest-Name': encodeURIComponent('Гость') } });
+  assert.equal(res.status, 200);
+  assert.deepEqual(sent.map(item => item.method), ['sendPhoto', 'sendDocument']);
+  assert.deepEqual(sent[0].bytes, jpeg);
+  assert.deepEqual(sent[1].bytes, original);
+  assert.equal(sent[1].name, 'original-camera.jpg');
+  const saved = app.sqlite.prepare('SELECT status,preview_message_id,message_id FROM photos WHERE id=?').get(id);
+  assert.deepEqual({ ...saved }, { status: 'delivered', preview_message_id: 1, message_id: 2 });
+});
+
+test('document rejection retries only the document after preview checkpoint', async t => {
+  const sent = []; let rejectDocument = true;
+  const app = fixture(t, { telegram: async url => {
+    const method = url.split('/').at(-1); sent.push(method);
+    return { json: async () => ({ ok: !(method === 'sendDocument' && rejectDocument), result: { message_id: sent.length } }) };
+  } });
+  const { cookie } = await app.session(); const id = randomUUID();
+  assert.equal((await app.upload(cookie, { id })).status, 502);
+  assert.equal(app.sqlite.prepare('SELECT preview_message_id FROM photos WHERE id=?').get(id).preview_message_id, 1);
+  rejectDocument = false;
+  assert.equal((await app.upload(cookie, { id })).status, 200);
+  assert.deepEqual(sent, ['sendPhoto', 'sendDocument', 'sendDocument']);
+  assert.equal((await app.upload(cookie, { id })).status, 200);
+  assert.equal(app.calls(), 3);
+});
+
+test('unknown document delivery never resends either preview or original', async t => {
+  const sent = [];
+  const app = fixture(t, { telegram: async url => {
+    const method = url.split('/').at(-1); sent.push(method);
+    if (method === 'sendDocument') throw new Error('Connection lost after document submission');
+    return { json: async () => ({ ok: true, result: { message_id: 1 } }) };
+  } });
+  const { cookie } = await app.session(); const id = randomUUID();
+  const first = await app.upload(cookie, { id });
+  assert.equal(first.status, 409); assert.equal((await first.json()).code, 'UNKNOWN_DELIVERY');
+  const retry = await app.upload(cookie, { id });
+  assert.equal(retry.status, 409); assert.equal((await retry.json()).code, 'UNKNOWN_DELIVERY');
+  assert.deepEqual(sent, ['sendPhoto', 'sendDocument']);
+  assert.equal(app.sqlite.prepare('SELECT preview_message_id FROM photos WHERE id=?').get(id).preview_message_id, 1);
 });

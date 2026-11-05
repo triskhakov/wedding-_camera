@@ -83,9 +83,12 @@
             text-shadow: 0 0 8px rgba(212, 175, 55, 0.8), 0 0 15px rgba(212, 175, 55, 0.4);
         }
 
+        #printable-card, .qr-print-card {
+            text-align: center;
+        }
         #qr-print-sheet { display: none; }
         @media print {
-            @page { size: A4 portrait; margin: 10mm; }
+            @page { size: A4 portrait; margin: 0; }
             html, body {
                 display: block !important;
                 height: auto !important;
@@ -117,8 +120,11 @@
             #qr-print-sheet {
                 display: grid !important;
                 grid-template-columns: repeat(2, minmax(0, 1fr));
-                gap: 10mm;
-                width: 190mm;
+                grid-template-rows: repeat(2, minmax(0, 1fr));
+                place-items: center;
+                gap: 0;
+                width: 210mm;
+                height: 297mm;
                 max-width: 100%;
                 margin: 0 auto;
                 color: #0c0a09;

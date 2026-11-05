@@ -83,18 +83,65 @@
             text-shadow: 0 0 8px rgba(212, 175, 55, 0.8), 0 0 15px rgba(212, 175, 55, 0.4);
         }
 
+        #qr-print-sheet { display: none; }
         @media print {
-            body * {
-                visibility: hidden;
+            @page { size: A4 portrait; margin: 10mm; }
+            html, body {
+                display: block !important;
+                height: auto !important;
+                min-height: 0 !important;
+                overflow: visible !important;
+                background: white !important;
             }
-            #printable-card, #printable-card * {
-                visibility: visible;
+            body > :not(#qr-print-sheet),
+            #modal-qr > div > :not(#printable-card) {
+                display: none !important;
             }
-            #printable-card {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
+            #modal-qr, #modal-qr > div {
+                position: static !important;
+                display: block !important;
+                width: 100% !important;
+                height: auto !important;
+                max-width: none !important;
+                max-height: none !important;
+                overflow: visible !important;
+                opacity: 1 !important;
+                transform: none !important;
+                filter: none !important;
+                backdrop-filter: none !important;
+                background: white !important;
+                border: 0 !important;
+                padding: 0 !important;
+                box-shadow: none !important;
+            }
+            #qr-print-sheet {
+                display: grid !important;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 10mm;
+                width: 190mm;
+                max-width: 100%;
+                margin: 0 auto;
+                color: #0c0a09;
+                background: white;
+            }
+            #qr-print-sheet .qr-print-card {
+                position: static !important;
+                box-sizing: border-box;
+                width: 90mm !important;
+                max-width: 100% !important;
+                height: auto !important;
+                overflow: visible !important;
+                margin: 0 auto !important;
+                break-inside: avoid;
+                page-break-inside: avoid;
+                box-shadow: none !important;
+                print-color-adjust: exact;
+                -webkit-print-color-adjust: exact;
+            }
+            #qr-print-sheet canvas {
+                width: 55mm !important;
+                height: 55mm !important;
+                max-width: 100%;
             }
         }
     </style>
@@ -1167,6 +1214,32 @@
                 btn.innerHTML = orig;
             }
         };
+
+        // Canvas pixels are not copied by cloneNode; copy them explicitly for print.
+        function prepareQrPrintSheet() {
+            let sheet = document.getElementById('qr-print-sheet');
+            if (!sheet) {
+                sheet = document.createElement('div');
+                sheet.id = 'qr-print-sheet';
+                sheet.setAttribute('aria-hidden', 'true');
+                document.body.appendChild(sheet);
+            }
+            sheet.replaceChildren();
+            const original = document.getElementById('printable-card');
+            const sourceCanvas = document.getElementById('qr-canvas');
+            for (let i = 0; i < 4; i++) {
+                const card = original.cloneNode(true);
+                card.removeAttribute('id');
+                card.classList.add('qr-print-card');
+                card.querySelectorAll('[id]').forEach(element => element.removeAttribute('id'));
+                const canvas = card.querySelector('canvas');
+                canvas.width = sourceCanvas.width;
+                canvas.height = sourceCanvas.height;
+                canvas.getContext('2d').drawImage(sourceCanvas, 0, 0);
+                sheet.appendChild(card);
+            }
+        }
+        window.addEventListener('beforeprint', prepareQrPrintSheet);
 
         function escapeHtml(str) {
             return (str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
